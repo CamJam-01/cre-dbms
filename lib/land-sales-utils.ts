@@ -31,6 +31,44 @@ export function makeCsv(rows: SaleRecord[]) {
   return [csvHeaders.join(','), ...rows.map(row => csvFields.map(field => csvCell(row[field])).join(','))].join('\r\n');
 }
 
+function validDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function validateImportRows(rows: string[][]) {
+  if (rows.length === 0) throw new Error(`Header error: the CSV is empty. Add this header row: ${csvHeaders.join(', ')}.`);
+  if (rows.length === 1) throw new Error('The CSV contains a header row but no data rows. Add at least one land sale and retry.');
+
+  const headers = rows[0].map(header => header.trim());
+  if (headers.length !== csvHeaders.length) throw new Error(`Header error: found ${headers.length} columns, but ${csvHeaders.length} are required. Expected: ${csvHeaders.join(', ')}.`);
+  for (let index = 0; index < csvHeaders.length; index += 1) {
+    if (headers[index].toLowerCase() !== csvHeaders[index].toLowerCase()) {
+      throw new Error(`Header error: expected "${csvHeaders[index]}" as column ${index + 1}, but found "${headers[index] || '(blank)'}". Rename or reorder the column and retry.`);
+    }
+  }
+
+  rows.slice(1).forEach((values, index) => {
+    const rowNumber = index + 2;
+    if (values.length !== csvHeaders.length) throw new Error(`Row ${rowNumber} has ${values.length} columns, but ${csvHeaders.length} are required. Check for missing commas or incorrectly formatted quoted values.`);
+    const [propertyName, address, saleDate, priceText, acreageText, seller, buyer] = values.map(value => value.trim());
+    const requiredValues = [
+      ['Property Name', propertyName], ['Address', address], ['Sale Date', saleDate], ['Sale Price', priceText],
+      ['Acreage', acreageText], ['Seller', seller], ['Buyer', buyer],
+    ];
+    for (const [field, value] of requiredValues) {
+      if (!value) throw new Error(`Row ${rowNumber}, ${field}: value is missing. Enter a value and retry the import.`);
+    }
+    if (!validDate(saleDate)) throw new Error(`Row ${rowNumber}, Sale Date: "${saleDate}" is not a valid YYYY-MM-DD date. Use a date such as 2026-07-31.`);
+    const salePrice = Number(priceText);
+    if (!Number.isFinite(salePrice) || salePrice < 0) throw new Error(`Row ${rowNumber}, Sale Price: "${priceText}" is not a valid non-negative number. Enter a numeric value such as 50000.`);
+    const acreage = Number(acreageText);
+    if (!Number.isFinite(acreage) || acreage <= 0) throw new Error(`Row ${rowNumber}, Acreage: "${acreageText}" is not a valid positive number. Enter a value greater than zero, such as 2.5.`);
+  });
+}
+
 export function parseCsv(text: string) {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -54,51 +92,6 @@ export function parseCsv(text: string) {
   if (quoted) throw new Error('CSV format error: an opening quote is missing a closing quote. Check quoted values and retry.');
   row.push(cell);
   if (row.some(value => value.trim() !== '')) rows.push(row);
+  validateImportRows(rows);
   return rows;
-}
-
-function required(rowNumber: number, field: string, value: string) {
-  if (!value) throw new Error(`Row ${rowNumber}, ${field}: value is missing. Enter a value and retry the import.`);
-}
-
-function validDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
-
-export function parseLandSalesImport(text: string): Omit<SaleRecord, 'id'>[] {
-  const parsed = parseCsv(text);
-  if (parsed.length === 0) throw new Error(`Header error: the CSV is empty. Add this header row: ${csvHeaders.join(', ')}.`);
-  if (parsed.length === 1) throw new Error('The CSV contains a header row but no data rows. Add at least one land sale and retry.');
-
-  const headers = parsed[0].map(header => header.trim());
-  if (headers.length !== csvHeaders.length) throw new Error(`Header error: found ${headers.length} columns, but ${csvHeaders.length} are required. Expected: ${csvHeaders.join(', ')}.`);
-  for (let index = 0; index < csvHeaders.length; index += 1) {
-    if (headers[index].toLowerCase() !== csvHeaders[index].toLowerCase()) {
-      throw new Error(`Header error: expected "${csvHeaders[index]}" as column ${index + 1}, but found "${headers[index] || '(blank)'}". Rename or reorder the column and retry.`);
-    }
-  }
-
-  return parsed.slice(1).map((values, index) => {
-    const rowNumber = index + 2;
-    if (values.length !== csvHeaders.length) throw new Error(`Row ${rowNumber} has ${values.length} columns, but ${csvHeaders.length} are required. Check for missing commas or incorrectly formatted quoted values.`);
-    const [property_name, address, sale_date, priceText, acreageText, seller, buyer, notes] = values.map(value => value.trim());
-    required(rowNumber, 'Property Name', property_name);
-    required(rowNumber, 'Address', address);
-    required(rowNumber, 'Sale Date', sale_date);
-    required(rowNumber, 'Sale Price', priceText);
-    required(rowNumber, 'Acreage', acreageText);
-    required(rowNumber, 'Seller', seller);
-    required(rowNumber, 'Buyer', buyer);
-
-    if (!validDate(sale_date)) throw new Error(`Row ${rowNumber}, Sale Date: "${sale_date}" is not a valid YYYY-MM-DD date. Use a date such as 2026-07-31.`);
-    const sale_price = Number(priceText);
-    if (!Number.isFinite(sale_price) || sale_price < 0) throw new Error(`Row ${rowNumber}, Sale Price: "${priceText}" is not a valid non-negative number. Enter a numeric value such as 50000.`);
-    const acreage = Number(acreageText);
-    if (!Number.isFinite(acreage) || acreage <= 0) throw new Error(`Row ${rowNumber}, Acreage: "${acreageText}" is not a valid positive number. Enter a value greater than zero, such as 2.5.`);
-
-    return { property_name, address, sale_date, sale_price, acreage, seller, buyer, notes };
-  });
 }
