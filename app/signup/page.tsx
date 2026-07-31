@@ -13,7 +13,7 @@ export default function SignupPage() {
     event.preventDefault(); setLoading(true); setError(''); setMessage('');
     const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
     if (error) setError(error.message);
-    else if (data.session) router.push('/land-sales');
+    else if (data.session) router.push('/dashboard');
     else setMessage('Account created. Check your email if confirmation is enabled, then sign in.');
     setLoading(false);
   }

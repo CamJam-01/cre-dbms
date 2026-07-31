@@ -1,8 +1,8 @@
 'use client';
 
-import { ChangeEvent, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { csvFields, csvHeaders, defaultSort, makeCsv, parseCsv, recordKey, SaleRecord, SortKey } from '@/lib/land-sales-utils';
+import { csvHeaders, defaultSort, makeCsv, parseCsv, recordKey, SaleRecord, SortKey } from '@/lib/land-sales-utils';
 
 export function LandSalesTable({ rows, onEdit, onDelete, onReload }: { rows: SaleRecord[]; onEdit: (row: SaleRecord) => void; onDelete: (id: string) => Promise<void>; onReload: () => Promise<void> }) {
   const supabase = createClient();
@@ -11,8 +11,18 @@ export function LandSalesTable({ rows, onEdit, onDelete, onReload }: { rows: Sal
   const [minPrice, setMinPrice] = useState(''); const [maxPrice, setMaxPrice] = useState('');
   const [minAcreage, setMinAcreage] = useState(''); const [maxAcreage, setMaxAcreage] = useState('');
   const [fromDate, setFromDate] = useState(''); const [toDate, setToDate] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(true); const [sort, setSort] = useState(defaultSort);
+  const [filtersOpen, setFiltersOpen] = useState(false); const [sort, setSort] = useState(defaultSort);
+  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [importing, setImporting] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase.auth.getUser();
+      const metadata = data.user?.user_metadata ?? {};
+      setFiltersOpen(metadata.show_filters_by_default === true);
+      setDensity(metadata.table_density === 'compact' ? 'compact' : 'comfortable');
+    })();
+  }, []);
 
   const filteredRows = useMemo(() => {
     const term = keyword.trim().toLowerCase();
@@ -70,11 +80,11 @@ export function LandSalesTable({ rows, onEdit, onDelete, onReload }: { rows: Sal
   const columns: { key: SortKey; label: string }[] = [{ key: 'property_name', label: 'Property' }, { key: 'address', label: 'Address' }, { key: 'sale_date', label: 'Sale date' }, { key: 'sale_price', label: 'Price' }, { key: 'acreage', label: 'Acres' }, { key: 'seller', label: 'Seller' }, { key: 'buyer', label: 'Buyer' }, { key: 'notes', label: 'Notes' }];
   return <>
     {error && <div className="alert">{error}</div>}{notice && <div className="notice">{notice}</div>}
-    <section className="card" style={{ marginBottom: 20 }}><div className="toolbar"><div className="search-field"><label htmlFor="sale-search">Search records</label><input id="sale-search" placeholder="Search property, address, buyer, seller, notes…" value={keyword} onChange={e => setKeyword(e.target.value)} /></div><div className="toolbar-actions"><button className="btn" onClick={() => setFiltersOpen(v => !v)}>{filtersOpen ? 'Hide filters' : 'Show filters'}</button><button className="btn" onClick={clearFilters}>Clear filters</button></div></div>
+    <section className="card" style={{ marginBottom: 20 }}><div className="toolbar"><div className="search-field"><label htmlFor="sale-search">Search records</label><input id="sale-search" placeholder="Search property, address, buyer, seller, notes…" value={keyword} onChange={e => setKeyword(e.target.value)} /></div><div className="toolbar-actions"><button type="button" className="btn" onClick={() => setFiltersOpen(v => !v)}>{filtersOpen ? 'Hide filters' : 'Show filters'}</button><button type="button" className="btn" onClick={clearFilters}>Clear filters</button></div></div>
       {filtersOpen && <div className="filter-grid"><div className="field"><label>Minimum sale price</label><input type="number" min="0" step="0.01" placeholder="e.g. 50000" value={minPrice} onChange={e => setMinPrice(e.target.value)} /></div><div className="field"><label>Maximum sale price</label><input type="number" min="0" step="0.01" placeholder="e.g. 250000" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} /></div><div className="field"><label>Minimum acreage</label><input type="number" min="0" step="0.0001" placeholder="e.g. 2.1" value={minAcreage} onChange={e => setMinAcreage(e.target.value)} /></div><div className="field"><label>Maximum acreage</label><input type="number" min="0" step="0.0001" placeholder="e.g. 3.5" value={maxAcreage} onChange={e => setMaxAcreage(e.target.value)} /></div><div className="field"><label>Sale date from</label><input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></div><div className="field"><label>Sale date to</label><input type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></div></div>}
     </section>
-    <section className="card"><div className="table-toolbar"><div className="muted">Showing <strong>{filteredRows.length}</strong> of <strong>{rows.length}</strong> records</div><div className="toolbar-actions"><input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={importCsv} hidden /><button className="btn" disabled={importing} onClick={() => fileInputRef.current?.click()}>{importing ? 'Importing…' : 'Import CSV'}</button><button className="btn primary" disabled={filteredRows.length === 0} onClick={exportCsv}>Export CSV</button></div></div><div className="table-help muted">Click a column header to sort ascending, descending, then return to the default order.</div>
-      <div className="table-wrap"><table><thead><tr>{columns.map(column => { const active = sort.key === column.key; const indicator = active ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ''; return <th key={column.key}><button className="sort-button" onClick={() => cycleSort(column.key)}>{column.label}{indicator}</button></th>; })}<th>Actions</th></tr></thead><tbody>{filteredRows.length === 0 ? <tr><td colSpan={9}>No records match the current search and filters.</td></tr> : filteredRows.map(row => <tr key={row.id}><td><strong>{row.property_name}</strong></td><td>{row.address}</td><td>{row.sale_date}</td><td>{money.format(row.sale_price)}</td><td>{row.acreage}</td><td>{row.seller}</td><td>{row.buyer}</td><td>{row.notes}</td><td><div className="row-actions"><button className="btn" onClick={() => onEdit(row)}>Edit</button><button className="btn danger" onClick={() => onDelete(row.id)}>Delete</button></div></td></tr>)}</tbody></table></div>
+    <section className={`card ${density === 'compact' ? 'table-compact' : ''}`}><div className="table-toolbar"><div className="muted">Showing <strong>{filteredRows.length}</strong> of <strong>{rows.length}</strong> records</div><div className="toolbar-actions"><input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={importCsv} hidden /><button type="button" className="btn" disabled={importing} onClick={() => fileInputRef.current?.click()}>{importing ? 'Importing…' : 'Import CSV'}</button><button type="button" className="btn primary" disabled={filteredRows.length === 0} onClick={exportCsv}>Export CSV</button></div></div><div className="table-help muted">Click a column header to sort ascending, descending, then return to the default order.</div>
+      <div className="table-wrap"><table><thead><tr>{columns.map(column => { const active = sort.key === column.key; const indicator = active ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ''; return <th key={column.key}><button type="button" className="sort-button" onClick={() => cycleSort(column.key)}>{column.label}{indicator}</button></th>; })}<th>Actions</th></tr></thead><tbody>{filteredRows.length === 0 ? <tr><td colSpan={9}>No records match the current search and filters.</td></tr> : filteredRows.map(row => <tr key={row.id}><td><strong>{row.property_name}</strong></td><td>{row.address}</td><td>{row.sale_date}</td><td>{money.format(row.sale_price)}</td><td>{row.acreage}</td><td>{row.seller}</td><td>{row.buyer}</td><td>{row.notes}</td><td><div className="row-actions"><button type="button" className="btn" onClick={() => onEdit(row)}>Edit</button><button type="button" className="btn danger" onClick={() => onDelete(row.id)}>Delete</button></div></td></tr>)}</tbody></table></div>
     </section>
   </>;
 }

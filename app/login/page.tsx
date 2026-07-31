@@ -17,7 +17,7 @@ export default function LoginPage() {
     event.preventDefault(); setLoading(true); setError('');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setError(error.message);
-    else router.push('/land-sales');
+    else router.push('/dashboard');
     setLoading(false);
   }
 
