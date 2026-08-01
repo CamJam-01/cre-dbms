@@ -18,7 +18,7 @@ export default function SignupPage() {
     setLoading(false);
   }
   return <main className="auth-shell"><section className="card auth-card">
-    <h1>Create user</h1><p className="muted">Create an account for the CRE DBMS.</p>
+    <h1>Create user</h1><p className="muted">Create an account for the Vantage CRE.</p>
     {error && <div className="alert">{error}</div>}{message && <div className="alert">{message}</div>}
     <form onSubmit={submit}>
       <div className="field"><label>Full name</label><input required value={fullName} onChange={e => setFullName(e.target.value)} /></div>

@@ -8,7 +8,7 @@ export default async function Home() {
   return <main className="home-shell">
     <section className="home-hero">
       <div className="home-eyebrow">Commercial Real Estate Database Management</div>
-      <h1>CRE DBMS</h1>
+      <h1>Vantage CRE</h1>
       <p className="home-lede">A focused workspace for organizing, searching, and managing commercial real estate sales data.</p>
       <div className="home-actions">
         <Link className="btn primary" href={user ? '/dashboard' : '/login'}>{user ? 'Go to dashboard' : 'Sign in'}</Link>
