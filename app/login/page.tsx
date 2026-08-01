@@ -22,7 +22,7 @@ export default function LoginPage() {
   }
 
   return <main className="auth-shell"><section className="card auth-card">
-    <h1>CRE DBMS</h1><p className="muted">Sign in to manage commercial real estate sales data.</p>
+    <h1>Vantage CRE</h1><p className="muted">Sign in to manage commercial real estate sales data.</p>
     {error && <div className="alert">{error}</div>}
     <form onSubmit={submit}>
       <div className="field"><label>Email</label><input type="email" required value={email} onChange={e => setEmail(e.target.value)} /></div>

@@ -20,11 +20,11 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const pathname = request.nextUrl.pathname;
-  const protectedRoute = pathname.startsWith('/land-sales') || pathname.startsWith('/users');
+  const protectedRoute = pathname.startsWith('/comp-data') || pathname.startsWith('/users');
   const authRoute = pathname === '/login' || pathname === '/signup';
 
   if (protectedRoute && !user) return NextResponse.redirect(new URL('/login', request.url));
-  if (authRoute && user) return NextResponse.redirect(new URL('/land-sales', request.url));
+  if (authRoute && user) return NextResponse.redirect(new URL('/comp-data', request.url));
   return response;
 }
 
