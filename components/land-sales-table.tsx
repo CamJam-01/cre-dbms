@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { csvHeaders, defaultSort, makeCsv, parseCsv, recordKey, SaleRecord, SortKey } from '@/lib/land-sales-utils';
+import { csvHeaders, defaultSort, makeCsv, parseCsv, recordKey, SaleRecord, SortKey, validDate } from '@/lib/land-sales-utils';
 
 export function LandSalesTable({ rows, onEdit, onDelete, onReload }: { rows: SaleRecord[]; onEdit: (row: SaleRecord) => void; onDelete: (id: string) => Promise<void>; onReload: () => Promise<void> }) {
   const supabase = createClient();
@@ -66,7 +66,14 @@ export function LandSalesTable({ rows, onEdit, onDelete, onReload }: { rows: Sal
         if (values.length !== expected.length) throw new Error(`Row ${index + 2} has the wrong number of columns.`);
         const [property_name, address, sale_date, priceText, acreageText, seller, buyer, notes] = values.map(value => value.trim());
         const sale_price = Number(priceText); const acreage = Number(acreageText);
-        if (!property_name || !address || !sale_date || !seller || !buyer || !Number.isFinite(sale_price) || sale_price < 0 || !Number.isFinite(acreage) || acreage <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(sale_date)) throw new Error(`Row ${index + 2} contains invalid or missing data.`);
+        const rowNumber = index + 2;
+        const requiredValues = [['Property Name', property_name], ['Address', address], ['Sale Date', sale_date], ['Sale Price', priceText], ['Acreage', acreageText], ['Seller', seller], ['Buyer', buyer]] as const;
+        for (const [field, value] of requiredValues) {
+          if (!value) throw new Error(`Row ${rowNumber}, ${field}: value is missing. Enter a value and retry the import.`);
+        }
+        if (!validDate(sale_date)) throw new Error(`Row ${rowNumber}, Sale Date: "${sale_date}" is not a valid YYYY-MM-DD date. Use a date such as 2026-07-31.`);
+        if (!Number.isFinite(sale_price) || sale_price < 0) throw new Error(`Row ${rowNumber}, Sale Price: "${priceText}" is not a valid non-negative number. Enter a numeric value such as 50000.`);
+        if (!Number.isFinite(acreage) || acreage <= 0) throw new Error(`Row ${rowNumber}, Acreage: "${acreageText}" is not a valid positive number. Enter a value greater than zero, such as 2.5.`);
         const record = { property_name, address, sale_date, sale_price, acreage, seller, buyer, notes }; const key = recordKey(record);
         if (known.has(key) || incoming.has(key)) { duplicates += 1; return; } incoming.add(key); records.push(record);
       });
