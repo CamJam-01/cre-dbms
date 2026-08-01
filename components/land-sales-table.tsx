@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { csvHeaders, defaultSort, makeCsv, parseCsv, recordKey, SaleRecord, SortKey } from '@/lib/land-sales-utils';
+import { csvHeaders, defaultSort, makeCsv, parseCsv, recordKey, SaleRecord, SortKey } from '@/lib/comp-data-utils';
 
 export function LandSalesTable({ rows, onEdit, onDelete, onReload }: { rows: SaleRecord[]; onEdit: (row: SaleRecord) => void; onDelete: (id: string) => Promise<void>; onReload: () => Promise<void> }) {
   const supabase = createClient();
@@ -47,7 +47,7 @@ export function LandSalesTable({ rows, onEdit, onDelete, onReload }: { rows: Sal
   function clearFilters() { setKeyword(''); setMinPrice(''); setMaxPrice(''); setMinAcreage(''); setMaxAcreage(''); setFromDate(''); setToDate(''); }
   function exportCsv() {
     const url = URL.createObjectURL(new Blob([makeCsv(filteredRows)], { type: 'text/csv;charset=utf-8;' }));
-    const link = document.createElement('a'); link.href = url; link.download = `land-sales-${new Date().toISOString().slice(0, 10)}.csv`; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    const link = document.createElement('a'); link.href = url; link.download = `comp-data-${new Date().toISOString().slice(0, 10)}.csv`; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
   }
 
   async function importCsv(event: ChangeEvent<HTMLInputElement>) {

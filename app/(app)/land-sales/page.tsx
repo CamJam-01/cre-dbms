@@ -2,8 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { LandSalesTable } from '@/components/land-sales-table';
-import type { SaleRecord } from '@/lib/land-sales-utils';
+import { LandSalesTable } from '@/components/comp-data-table';
+import type { SaleRecord } from '@/lib/comp-data-utils';
 
 type SaleForm = { property_name: string; address: string; sale_date: string; sale_price: string; acreage: string; seller: string; buyer: string; notes: string };
 const empty: SaleForm = { property_name: '', address: '', sale_date: '', sale_price: '', acreage: '', seller: '', buyer: '', notes: '' };
@@ -17,8 +17,8 @@ export default function LandSalesPage() {
   function reset() { setEditing(null); setForm(empty); setFormOpen(false); }
   async function submit(event: FormEvent) { event.preventDefault(); setSaving(true); setError(''); const payload = { ...form, sale_price: Number(form.sale_price), acreage: Number(form.acreage) }; const result = editing ? await supabase.from('land_sales').update(payload).eq('id', editing) : await supabase.from('land_sales').insert(payload); if (result.error) setError(result.error.message); else { reset(); await load(); } setSaving(false); }
   async function remove(id: string) { if (!confirm('Delete this land sale?')) return; setError(''); const { error: deleteError } = await supabase.from('land_sales').delete().eq('id', id); if (deleteError) setError(deleteError.message); else await load(); }
-  return <main className="container"><div className="page-head"><div><h1>Land Sales</h1><div className="muted">Search, filter, sort, import, and export land transaction records.</div></div></div>{error && <div className="alert">{error}</div>}
-    {loading ? <section className="card">Loading land sales…</section> : <LandSalesTable rows={rows} onEdit={edit} onDelete={remove} onReload={load} />}
+  return <main className="container"><div className="page-head"><div><h1>Comp Data</h1><div className="muted">Search, filter, sort, import, and export land transaction records.</div></div></div>{error && <div className="alert">{error}</div>}
+    {loading ? <section className="card">Loading Comp Data…</section> : <LandSalesTable rows={rows} onEdit={edit} onDelete={remove} onReload={load} />}
     <section className="card add-sale-card"><div className="collapsible-head"><div><h2 style={{ margin: 0 }}>{editing ? 'Edit land sale' : 'Add land sale'}</h2><div className="muted">{editing ? 'Update the selected transaction.' : 'Add a new transaction to the database.'}</div></div><button className="btn" type="button" onClick={() => setFormOpen(open => !open)}>{formOpen ? 'Hide form' : editing ? 'Show form' : 'Add land sale'}</button></div>
       {formOpen && <form onSubmit={submit}><div className="form-grid">
         {([['property_name','Property name'],['address','Address'],['sale_date','Sale date'],['sale_price','Sale price'],['acreage','Acreage'],['seller','Seller'],['buyer','Buyer']] as const).map(([key,label]) => <div className="field" key={key}><label>{label}</label><input required value={form[key]} type={key === 'sale_date' ? 'date' : key === 'sale_price' || key === 'acreage' ? 'number' : 'text'} step={key === 'sale_price' ? '0.01' : key === 'acreage' ? '0.0001' : undefined} onChange={e => change(key,e.target.value)} /></div>)}

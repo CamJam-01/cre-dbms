@@ -8,7 +8,7 @@ export function Nav({ email }: { email: string }) {
   const router = useRouter(); const supabase = createClient();
   async function logout() { await supabase.auth.signOut(); router.push('/'); router.refresh(); }
   return <header className="topbar"><div className="topbar-inner">
-    <Link href="/dashboard" className="brand">Vantage CRE</Link>
-    <nav className="nav"><Link href="/dashboard">Dashboard</Link><Link href="/land-sales">Land Sales</Link><Link href="/users">Users</Link><span className="muted">{email}</span><button onClick={logout}>Log out</button></nav>
+    <Link href="/" className="brand">Vantage CRE</Link>
+    <nav className="nav"><Link href="/dashboard">Dashboard</Link><Link href="/comp-data">Comp Data</Link><Link href="/users">Users</Link><span className="muted">{email}</span><button onClick={logout}>Log out</button></nav>
   </div></header>;
 }

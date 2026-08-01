@@ -32,7 +32,7 @@ The values are available from the Supabase project settings/API page.
 
 The migration is stored at `supabase/migrations/20260730150000_create_users_and_land_sales.sql` and has already been applied to the configured Supabase project for this POC.
 
-The Land Sales fields are:
+The Comp Data fields are:
 
 - Property name
 - Address

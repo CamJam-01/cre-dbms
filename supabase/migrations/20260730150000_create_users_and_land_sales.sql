@@ -43,9 +43,9 @@ create policy "authenticated users can read users" on public.users for select to
 create policy "authenticated users can insert users" on public.users for insert to authenticated with check (true);
 create policy "authenticated users can update users" on public.users for update to authenticated using (true) with check (true);
 create policy "authenticated users can delete users" on public.users for delete to authenticated using (true);
-create policy "authenticated users can read land sales" on public.land_sales for select to authenticated using (true);
-create policy "authenticated users can insert land sales" on public.land_sales for insert to authenticated with check (true);
-create policy "authenticated users can update land sales" on public.land_sales for update to authenticated using (true) with check (true);
-create policy "authenticated users can delete land sales" on public.land_sales for delete to authenticated using (true);
+create policy "authenticated users can read Comp Data" on public.land_sales for select to authenticated using (true);
+create policy "authenticated users can insert Comp Data" on public.land_sales for insert to authenticated with check (true);
+create policy "authenticated users can update Comp Data" on public.land_sales for update to authenticated using (true) with check (true);
+create policy "authenticated users can delete Comp Data" on public.land_sales for delete to authenticated using (true);
 grant select, insert, update, delete on public.users to authenticated;
 grant select, insert, update, delete on public.land_sales to authenticated;
