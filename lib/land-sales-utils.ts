@@ -31,7 +31,7 @@ export function makeCsv(rows: SaleRecord[]) {
   return [csvHeaders.join(','), ...rows.map(row => csvFields.map(field => csvCell(row[field])).join(','))].join('\r\n');
 }
 
-function validDate(value: string) {
+export function validDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
