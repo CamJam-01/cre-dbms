@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ConfirmationDialog } from '@/components/confirmation-dialog';
-import { LandSalesTable } from '@/components/land-sales-table';
+import { CompDataTable } from '@/components/land-sales-table';
 import type { SaleRecord } from '@/lib/land-sales-utils';
 
 type SaleForm = { property_name: string; address: string; sale_date: string; sale_price: string; acreage: string; seller: string; buyer: string; notes: string };
@@ -20,7 +20,7 @@ export default function LandSalesPage() {
   async function remove(id: string) { setPendingDelete(rows.find(row => row.id === id) ?? null); }
   async function confirmRemove() { if (!pendingDelete) return; setDeleting(true); setError(''); const { error: deleteError } = await supabase.from('land_sales').delete().eq('id', pendingDelete.id); if (deleteError) setError(deleteError.message); else { setPendingDelete(null); await load(); } setDeleting(false); }
   return <main className="container"><div className="page-head"><div><h1>Land Sales</h1><div className="muted">Search, filter, sort, import, and export land transaction records.</div></div></div>{error && <div className="alert">{error}</div>}
-    {loading ? <section className="card">Loading land sales…</section> : <LandSalesTable rows={rows} onEdit={edit} onDelete={remove} onReload={load} />}
+    {loading ? <section className="card">Loading land sales…</section> : <CompDataTable rows={rows} onEdit={edit} onDelete={remove} onReload={load} />}
     <section className="card add-sale-card"><div className="collapsible-head"><div><h2 style={{ margin: 0 }}>{editing ? 'Edit land sale' : 'Add land sale'}</h2><div className="muted">{editing ? 'Update the selected transaction.' : 'Add a new transaction to the database.'}</div></div><button className="btn" type="button" onClick={() => setFormOpen(open => !open)}>{formOpen ? 'Hide form' : editing ? 'Show form' : 'Add land sale'}</button></div>
       {formOpen && <form onSubmit={submit}><div className="form-grid">
         {([['property_name','Property name'],['address','Address'],['sale_date','Sale date'],['sale_price','Sale price'],['acreage','Acreage'],['seller','Seller'],['buyer','Buyer']] as const).map(([key,label]) => <div className="field" key={key}><label>{label}</label><input required value={form[key]} type={key === 'sale_date' ? 'date' : key === 'sale_price' || key === 'acreage' ? 'number' : 'text'} step={key === 'sale_price' ? '0.01' : key === 'acreage' ? '0.0001' : undefined} onChange={e => change(key,e.target.value)} /></div>)}

@@ -4,7 +4,7 @@ import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { csvHeaders, defaultSort, makeCsv, parseCsv, recordKey, SaleRecord, SortKey, validDate } from '@/lib/land-sales-utils';
 
-export function LandSalesTable({ rows, onEdit, onDelete, onReload }: { rows: SaleRecord[]; onEdit: (row: SaleRecord) => void; onDelete: (id: string) => Promise<void>; onReload: () => Promise<void> }) {
+export function CompDataTable({ rows, onEdit, onDelete, onReload }: { rows: SaleRecord[]; onEdit: (row: SaleRecord) => void; onDelete: (id: string) => Promise<void>; onReload: () => Promise<void> }) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [keyword, setKeyword] = useState('');
