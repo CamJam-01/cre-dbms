@@ -40,7 +40,7 @@ export function validDate(value: string) {
 
 function validateImportRows(rows: string[][]) {
   if (rows.length === 0) throw new Error(`Header error: the CSV is empty. Add this header row: ${csvHeaders.join(', ')}.`);
-  if (rows.length === 1) throw new Error('The CSV contains a header row but no data rows. Add at least one land sale and retry.');
+  if (rows.length === 1) throw new Error('The CSV contains a header row but no data rows. Add at least one comparable and retry.');
 
   const headers = rows[0].map(header => header.trim());
   if (headers.length !== csvHeaders.length) throw new Error(`Header error: found ${headers.length} columns, but ${csvHeaders.length} are required. Expected: ${csvHeaders.join(', ')}.`);

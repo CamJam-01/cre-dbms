@@ -58,7 +58,7 @@ export function CompDataTable({ rows, onEdit, onDelete, onReload }: { rows: Sale
       if (parsed.length < 2) throw new Error('The CSV must contain a header row and at least one data row.');
       const expected = csvHeaders.map(header => header.toLowerCase()); const headers = parsed[0].map(header => header.trim().toLowerCase());
       if (headers.length !== expected.length || headers.some((header, index) => header !== expected[index])) throw new Error(`CSV headers must be exactly: ${csvHeaders.join(', ')}`);
-      const { data: existing, error: existingError } = await supabase.from('land_sales').select('property_name,address,sale_date,sale_price,acreage,seller,buyer,notes');
+      const { data: existing, error: existingError } = await supabase.from('comp_data').select('property_name,address,sale_date,sale_price,acreage,seller,buyer,notes');
       if (existingError) throw new Error(existingError.message);
       const known = new Set((existing ?? []).map(row => recordKey(row as Omit<SaleRecord, 'id'>))); const incoming = new Set<string>();
       const records: Omit<SaleRecord, 'id'>[] = []; let duplicates = 0;
@@ -77,7 +77,7 @@ export function CompDataTable({ rows, onEdit, onDelete, onReload }: { rows: Sale
         const record = { property_name, address, sale_date, sale_price, acreage, seller, buyer, notes }; const key = recordKey(record);
         if (known.has(key) || incoming.has(key)) { duplicates += 1; return; } incoming.add(key); records.push(record);
       });
-      if (records.length) { const { error: insertError } = await supabase.from('land_sales').insert(records); if (insertError) throw new Error(insertError.message); await onReload(); }
+      if (records.length) { const { error: insertError } = await supabase.from('comp_data').insert(records); if (insertError) throw new Error(insertError.message); await onReload(); }
       setNotice(`Import complete. ${records.length} record${records.length === 1 ? '' : 's'} imported${duplicates ? `; ${duplicates} duplicate${duplicates === 1 ? '' : 's'} skipped` : ''}.`);
     } catch (importError) { setError(importError instanceof Error ? importError.message : 'The CSV could not be imported.'); }
     finally { setImporting(false); }

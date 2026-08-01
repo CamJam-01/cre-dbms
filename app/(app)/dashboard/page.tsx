@@ -38,7 +38,7 @@ export default function DashboardPage() {
   return <main className="container">
     <div className="page-head"><div><h1>Dashboard</h1><div className="muted">Welcome back, {name || 'there'}.</div></div></div>
     <section className="dashboard-grid">
-      <article className="card dashboard-card"><div className="dashboard-kicker">Workspace</div><h2>Comp Data</h2><p className="muted">Search, filter, sort, import, export, and manage your land sale records.</p><a className="btn primary" href="/comp-data">Open Comp Data</a></article>
+      <article className="card dashboard-card"><div className="dashboard-kicker">Workspace</div><h2>Comp Data</h2><p className="muted">Search, filter, sort, import, export, and manage your comparables.</p><a className="btn primary" href="/comp-data">Open Comp Data</a></article>
       <article className="card dashboard-card"><div className="dashboard-kicker">Account</div><h2>Personal settings</h2><p className="muted">Adjust a few display preferences to make the database fit your workflow.</p></article>
     </section>
     <section className="card settings-card"><h2 style={{ marginTop: 0 }}>UX settings</h2><div className="settings-grid">
