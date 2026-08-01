@@ -2,8 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { LandSalesTable } from '@/components/comp-data-table';
-import type { SaleRecord } from '@/lib/comp-data-utils';
+import { LandSalesTable } from '@/components/land-sales-table';
+import type { SaleRecord } from '@/lib/land-sales-utils';
 
 type SaleForm = { property_name: string; address: string; sale_date: string; sale_price: string; acreage: string; seller: string; buyer: string; notes: string };
 const empty: SaleForm = { property_name: '', address: '', sale_date: '', sale_price: '', acreage: '', seller: '', buyer: '', notes: '' };

@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { csvHeaders, defaultSort, makeCsv, parseCsv, recordKey, SaleRecord, SortKey } from '@/lib/comp-data-utils';
+import { csvHeaders, defaultSort, makeCsv, parseCsv, recordKey, SaleRecord, SortKey } from '@/lib/land-sales-utils';
 
 export function LandSalesTable({ rows, onEdit, onDelete, onReload }: { rows: SaleRecord[]; onEdit: (row: SaleRecord) => void; onDelete: (id: string) => Promise<void>; onReload: () => Promise<void> }) {
   const supabase = createClient();
