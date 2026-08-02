@@ -18,12 +18,12 @@ export default function SignupPage() {
     setLoading(false);
   }
   return <main className="auth-shell"><section className="card auth-card">
-    <h1>Create user</h1><p className="muted">Create an account for the Vantage CRE.</p>
+    <div className="eyebrow">Vantage CRE / New workspace</div><h1>Create account</h1><p className="muted">Create an account for the Vantage CRE workspace.</p>
     {error && <div className="alert">{error}</div>}{message && <div className="alert">{message}</div>}
     <form onSubmit={submit}>
-      <div className="field"><label>Full name</label><input required value={fullName} onChange={e => setFullName(e.target.value)} /></div>
-      <div className="field" style={{marginTop: 12}}><label>Email</label><input type="email" required value={email} onChange={e => setEmail(e.target.value)} /></div>
-      <div className="field" style={{marginTop: 12}}><label>Password</label><input type="password" minLength={6} required value={password} onChange={e => setPassword(e.target.value)} /></div>
+      <div className="field"><label htmlFor="signup-name">Full name</label><input id="signup-name" autoComplete="name" required value={fullName} onChange={e => setFullName(e.target.value)} /></div>
+      <div className="field" style={{marginTop: 12}}><label htmlFor="signup-email">Email</label><input id="signup-email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} /></div>
+      <div className="field" style={{marginTop: 12}}><label htmlFor="signup-password">Password</label><input id="signup-password" type="password" autoComplete="new-password" minLength={6} required value={password} onChange={e => setPassword(e.target.value)} /></div>
       <div className="actions"><button className="btn primary" disabled={loading}>{loading ? 'Creating…' : 'Create account'}</button></div>
     </form>
     <div className="auth-footer">Already have an account? <Link href="/login"><strong>Sign in</strong></Link></div>

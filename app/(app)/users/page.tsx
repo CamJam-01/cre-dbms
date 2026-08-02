@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { ConfirmationDialog } from '@/components/confirmation-dialog';
 import { createClient } from '@/lib/supabase/client';
 
@@ -9,8 +9,8 @@ const empty = { full_name: '', email: '', password: '' };
 
 export default function UsersPage() {
   const supabase = createClient(); const [users, setUsers] = useState<User[]>([]); const [form, setForm] = useState(empty); const [editing, setEditing] = useState<string | null>(null); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [pendingDelete, setPendingDelete] = useState<User | null>(null); const [deleting, setDeleting] = useState(false);
-  async function load() { setLoading(true); const { data, error } = await supabase.from('users').select('id,email,full_name,created_at').order('created_at'); if (error) setError(error.message); else setUsers((data ?? []) as User[]); setLoading(false); }
-  useEffect(() => { void load(); }, []);
+  const load = useCallback(async () => { setLoading(true); const { data, error } = await supabase.from('users').select('id,email,full_name,created_at').order('created_at'); if (error) setError(error.message); else setUsers((data ?? []) as User[]); setLoading(false); }, [supabase]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
   function change(key: keyof typeof empty, value: string) { setForm(f => ({ ...f, [key]: value })); }
   function edit(user: User) { setEditing(user.id); setForm({ full_name: user.full_name, email: user.email, password: '' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   function reset() { setEditing(null); setForm(empty); }

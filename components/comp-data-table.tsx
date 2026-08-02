@@ -22,7 +22,7 @@ export function CompDataTable({ rows, onEdit, onDelete, onReload }: { rows: Sale
       setFiltersOpen(metadata.show_filters_by_default === true);
       setDensity(metadata.table_density === 'compact' ? 'compact' : 'comfortable');
     })();
-  }, []);
+  }, [supabase.auth]);
 
   const filteredRows = useMemo(() => {
     const term = keyword.trim().toLowerCase();
@@ -38,6 +38,8 @@ export function CompDataTable({ rows, onEdit, onDelete, onReload }: { rows: Sale
       return sort.direction === 'asc' ? cmp : -cmp;
     });
   }, [rows, keyword, minPrice, maxPrice, minAcreage, maxAcreage, fromDate, toDate, sort]);
+
+  const activeFilterCount = [keyword, minPrice, maxPrice, minAcreage, maxAcreage, fromDate, toDate].filter(Boolean).length;
 
   function cycleSort(key: SortKey) {
     if (sort.key !== key) setSort({ key, direction: 'asc' });
@@ -87,6 +89,7 @@ export function CompDataTable({ rows, onEdit, onDelete, onReload }: { rows: Sale
   const columns: { key: SortKey; label: string }[] = [{ key: 'property_name', label: 'Property' }, { key: 'address', label: 'Address' }, { key: 'sale_date', label: 'Sale date' }, { key: 'sale_price', label: 'Price' }, { key: 'acreage', label: 'Acres' }, { key: 'seller', label: 'Seller' }, { key: 'buyer', label: 'Buyer' }, { key: 'notes', label: 'Notes' }];
   return <>
     {error && <div className="alert">{error}</div>}{notice && <div className="notice">{notice}</div>}
+    {activeFilterCount > 0 && <div className="filter-state" role="status">{activeFilterCount} active filter{activeFilterCount === 1 ? '' : 's'} · <button type="button" onClick={clearFilters}>Clear all</button></div>}
     <section className="card" style={{ marginBottom: 20 }}><div className="toolbar"><div className="search-field"><label htmlFor="sale-search">Search records</label><input id="sale-search" placeholder="Search property, address, buyer, seller, notes…" value={keyword} onChange={e => setKeyword(e.target.value)} /></div><div className="toolbar-actions"><button type="button" className="btn" onClick={() => setFiltersOpen(v => !v)}>{filtersOpen ? 'Hide filters' : 'Show filters'}</button><button type="button" className="btn" onClick={clearFilters}>Clear filters</button></div></div>
       {filtersOpen && <div className="filter-grid"><div className="field"><label>Minimum sale price</label><input type="number" min="0" step="0.01" placeholder="e.g. 50000" value={minPrice} onChange={e => setMinPrice(e.target.value)} /></div><div className="field"><label>Maximum sale price</label><input type="number" min="0" step="0.01" placeholder="e.g. 250000" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} /></div><div className="field"><label>Minimum acreage</label><input type="number" min="0" step="0.0001" placeholder="e.g. 2.1" value={minAcreage} onChange={e => setMinAcreage(e.target.value)} /></div><div className="field"><label>Maximum acreage</label><input type="number" min="0" step="0.0001" placeholder="e.g. 3.5" value={maxAcreage} onChange={e => setMaxAcreage(e.target.value)} /></div><div className="field"><label>Sale date from</label><input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} /></div><div className="field"><label>Sale date to</label><input type="date" value={toDate} onChange={e => setToDate(e.target.value)} /></div></div>}
     </section>
