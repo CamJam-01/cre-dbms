@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -51,8 +52,8 @@ export default function DashboardPage() {
   return <main className="container">
     <div className="page-head"><div><h1>Dashboard</h1><div className="muted">Welcome back, {name || 'there'}.</div></div></div>
     <section className="dashboard-grid">
-      <article className="card dashboard-card"><div className="dashboard-kicker">Workspace</div><h2>Comp Data</h2><p className="muted">Search, filter, sort, import, export, and manage your comparables.</p><a className="btn primary" href="/comp-data">Open Comp Data</a></article>
-      <article className="card dashboard-card"><div className="dashboard-kicker">Latest activity</div><h2>{stats.latestProperty || 'No records yet'}</h2><p className="muted">{stats.latestDate ? `Most recent sale recorded ${stats.latestDate}.` : 'Add your first comparable to start building the workspace.'}</p><a className="btn" href="/comp-data">Review records</a></article>
+      <article className="card dashboard-card"><div className="dashboard-kicker">Workspace</div><h2>Data Tables</h2><p className="muted">Create structured tables, manage records, validate fields, and export DOCX reports.</p><Link className="btn primary" href="/data-tables">Open Data Tables</Link></article>
+      <article className="card dashboard-card"><div className="dashboard-kicker">Latest activity</div><h2>{stats.latestProperty || 'No records yet'}</h2><p className="muted">{stats.latestDate ? `Most recent sale recorded ${stats.latestDate}.` : 'Create a data table to start building the workspace.'}</p><Link className="btn" href="/data-tables">Review tables</Link></article>
     </section>
     <section className="dashboard-metrics" aria-label="Comp Data summary">
       <article className="metric-card"><span className="metric-label">Total records</span><strong>{stats.total}</strong><small>available comparables</small></article>

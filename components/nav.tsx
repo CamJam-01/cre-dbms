@@ -15,7 +15,8 @@ export function Nav({ email }: { email: string }) {
       <button type="button" className="nav-toggle" aria-expanded={open} aria-controls="authenticated-nav-links" onClick={() => setOpen(value => !value)}>{open ? 'Close menu' : 'Menu'}</button>
       <div id="authenticated-nav-links" className={`nav-links${open ? ' open' : ''}`}>
         <Link href="/dashboard" className={linkClass('/dashboard')} aria-current={pathname === '/dashboard' ? 'page' : undefined} onClick={() => setOpen(false)}>Dashboard</Link>
-        <Link href="/comp-data" className={linkClass('/comp-data')} aria-current={pathname === '/comp-data' ? 'page' : undefined} onClick={() => setOpen(false)}>Comp Data</Link>
+        <Link href="/data-tables" className={linkClass('/data-tables')} aria-current={pathname.startsWith('/data-tables') ? 'page' : undefined} onClick={() => setOpen(false)}>Data Tables</Link>
+        <Link href="/templates" className={linkClass('/templates')} aria-current={pathname === '/templates' ? 'page' : undefined} onClick={() => setOpen(false)}>Templates</Link>
         <Link href="/users" className={linkClass('/users')} aria-current={pathname === '/users' ? 'page' : undefined} onClick={() => setOpen(false)}>Users</Link>
         <span className="muted">{email}</span>
         <button type="button" onClick={logout}>Log out</button>

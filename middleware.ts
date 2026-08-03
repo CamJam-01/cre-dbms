@@ -20,7 +20,7 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const pathname = request.nextUrl.pathname;
-  const protectedRoute = pathname.startsWith('/comp-data') || pathname.startsWith('/users');
+  const protectedRoute = pathname.startsWith('/comp-data') || pathname.startsWith('/data-tables') || pathname.startsWith('/templates') || pathname.startsWith('/users');
   const authRoute = pathname === '/login' || pathname === '/signup';
 
   if (protectedRoute && !user) return NextResponse.redirect(new URL('/login', request.url));
