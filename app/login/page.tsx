@@ -22,11 +22,11 @@ export default function LoginPage() {
   }
 
   return <main className="auth-shell"><section className="card auth-card">
-    <h1>Vantage CRE</h1><p className="muted">Sign in to manage commercial real estate sales data.</p>
+    <div className="eyebrow">Vantage CRE / Secure access</div><h1>Sign in</h1><p className="muted">Manage commercial real estate sales data in your workspace.</p>
     {error && <div className="alert">{error}</div>}
     <form onSubmit={submit}>
-      <div className="field"><label>Email</label><input type="email" required value={email} onChange={e => setEmail(e.target.value)} /></div>
-      <div className="field" style={{marginTop: 12}}><label>Password</label><input type="password" required value={password} onChange={e => setPassword(e.target.value)} /></div>
+      <div className="field"><label htmlFor="login-email">Email</label><input id="login-email" type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} /></div>
+      <div className="field" style={{marginTop: 12}}><label htmlFor="login-password">Password</label><input id="login-password" type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} /></div>
       <div className="actions"><button className="btn primary" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button></div>
     </form>
     <div className="auth-footer">New user? <Link href="/signup"><strong>Create an account</strong></Link></div>

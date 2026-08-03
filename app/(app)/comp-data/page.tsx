@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ConfirmationDialog } from '@/components/confirmation-dialog';
 import { CompDataTable } from '@/components/comp-data-table';
@@ -11,8 +11,8 @@ const empty: SaleForm = { property_name: '', address: '', sale_date: '', sale_pr
 
 export default function CompDataPage() {
   const supabase = createClient(); const [rows, setRows] = useState<SaleRecord[]>([]); const [form, setForm] = useState(empty); const [editing, setEditing] = useState<string | null>(null); const [formOpen, setFormOpen] = useState(false); const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [pendingDelete, setPendingDelete] = useState<SaleRecord | null>(null); const [deleting, setDeleting] = useState(false);
-  async function load() { setLoading(true); const { data, error: loadError } = await supabase.from('comp_data').select('*').order('sale_date', { ascending: false }); if (loadError) setError(loadError.message); else setRows((data ?? []) as SaleRecord[]); setLoading(false); }
-  useEffect(() => { void load(); }, []);
+  const load = useCallback(async () => { setLoading(true); const { data, error: loadError } = await supabase.from('comp_data').select('*').order('sale_date', { ascending: false }); if (loadError) setError(loadError.message); else setRows((data ?? []) as SaleRecord[]); setLoading(false); }, [supabase]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
   function change(key: keyof SaleForm, value: string) { setForm(current => ({ ...current, [key]: value })); }
   function edit(row: SaleRecord) { setEditing(row.id); setForm({ property_name: row.property_name, address: row.address, sale_date: row.sale_date, sale_price: String(row.sale_price), acreage: String(row.acreage), seller: row.seller, buyer: row.buyer, notes: row.notes }); setFormOpen(true); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }
   function reset() { setEditing(null); setForm(empty); setFormOpen(false); }

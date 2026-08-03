@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 const defaults = { table_density: 'comfortable', show_filters_by_default: false } as const;
 
 type Settings = { table_density: 'comfortable' | 'compact'; show_filters_by_default: boolean };
+type DashboardStats = { total: number; averagePrice: number; averageAcreage: number; latestDate: string; latestProperty: string };
+const emptyStats: DashboardStats = { total: 0, averagePrice: 0, averageAcreage: 0, latestDate: '', latestProperty: '' };
 
 export default function DashboardPage() {
   const supabase = createClient();
@@ -14,8 +16,9 @@ export default function DashboardPage() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [stats, setStats] = useState<DashboardStats>(emptyStats);
 
-  useEffect(() => {
+  const loadDashboard = useCallback(async () => {
     void (async () => {
       const { data } = await supabase.auth.getUser();
       const metadata = data.user?.user_metadata ?? {};
@@ -24,8 +27,18 @@ export default function DashboardPage() {
         table_density: metadata.table_density === 'compact' ? 'compact' : defaults.table_density,
         show_filters_by_default: metadata.show_filters_by_default === true,
       });
+      const { data: rows, error: statsError } = await supabase.from('comp_data').select('property_name,sale_date,sale_price,acreage').order('sale_date', { ascending: false });
+      if (statsError) { setError(statsError.message); return; }
+      const records = rows ?? [];
+      const total = records.length;
+      const averagePrice = total ? records.reduce((sum, row) => sum + Number(row.sale_price), 0) / total : 0;
+      const averageAcreage = total ? records.reduce((sum, row) => sum + Number(row.acreage), 0) / total : 0;
+      const latest = records[0];
+      setStats({ total, averagePrice, averageAcreage, latestDate: latest?.sale_date ?? '', latestProperty: latest?.property_name ?? '' });
     })();
   }, [supabase]);
+
+  useEffect(() => { void Promise.resolve().then(loadDashboard); }, [loadDashboard]);
 
   async function saveSettings() {
     setSaving(true); setError(''); setNotice('');
@@ -39,7 +52,12 @@ export default function DashboardPage() {
     <div className="page-head"><div><h1>Dashboard</h1><div className="muted">Welcome back, {name || 'there'}.</div></div></div>
     <section className="dashboard-grid">
       <article className="card dashboard-card"><div className="dashboard-kicker">Workspace</div><h2>Comp Data</h2><p className="muted">Search, filter, sort, import, export, and manage your comparables.</p><a className="btn primary" href="/comp-data">Open Comp Data</a></article>
-      <article className="card dashboard-card"><div className="dashboard-kicker">Account</div><h2>Personal settings</h2><p className="muted">Adjust a few display preferences to make the database fit your workflow.</p></article>
+      <article className="card dashboard-card"><div className="dashboard-kicker">Latest activity</div><h2>{stats.latestProperty || 'No records yet'}</h2><p className="muted">{stats.latestDate ? `Most recent sale recorded ${stats.latestDate}.` : 'Add your first comparable to start building the workspace.'}</p><a className="btn" href="/comp-data">Review records</a></article>
+    </section>
+    <section className="dashboard-metrics" aria-label="Comp Data summary">
+      <article className="metric-card"><span className="metric-label">Total records</span><strong>{stats.total}</strong><small>available comparables</small></article>
+      <article className="metric-card"><span className="metric-label">Average sale price</span><strong>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(stats.averagePrice)}</strong><small>across current records</small></article>
+      <article className="metric-card"><span className="metric-label">Average acreage</span><strong>{stats.averageAcreage.toFixed(2)}</strong><small>acres per comparable</small></article>
     </section>
     <section className="card settings-card"><h2 style={{ marginTop: 0 }}>UX settings</h2><div className="settings-grid">
       <div className="field"><label htmlFor="table-density">Comp Data table density</label><select id="table-density" value={settings.table_density} onChange={e => setSettings(s => ({ ...s, table_density: e.target.value as Settings['table_density'] }))}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select><span className="field-help">Compact shows more records on screen; comfortable gives rows more breathing room.</span></div>
