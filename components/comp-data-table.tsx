@@ -79,7 +79,7 @@ export function CompDataTable({ rows, onEdit, onDelete, onReload }: { rows: Sale
         const record = { property_name, address, sale_date, sale_price, acreage, seller, buyer, notes }; const key = recordKey(record);
         if (known.has(key) || incoming.has(key)) { duplicates += 1; return; } incoming.add(key); records.push(record);
       });
-      if (records.length) { const { error: insertError } = await supabase.from('comp_data').insert(records); if (insertError) throw new Error(insertError.message); await onReload(); }
+      if (records.length) { const { error: insertError } = await supabase.from('comp_data').upsert(records, { onConflict: 'record_fingerprint', ignoreDuplicates: true }); if (insertError) throw new Error(insertError.code === '23505' ? 'A duplicate record was detected while importing. Retry the import; duplicate rows are skipped automatically.' : insertError.message); await onReload(); }
       setNotice(`Import complete. ${records.length} record${records.length === 1 ? '' : 's'} imported${duplicates ? `; ${duplicates} duplicate${duplicates === 1 ? '' : 's'} skipped` : ''}.`);
     } catch (importError) { setError(importError instanceof Error ? importError.message : 'The CSV could not be imported.'); }
     finally { setImporting(false); }
