@@ -143,8 +143,8 @@ h3 { font-size: 1.55rem; line-height: 1.1; }
 .field-help, .checkbox-field small { color: var(--color-text-subtle); font-size: 0.78rem; line-height: 1.5; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 
-.toolbar, .table-toolbar, .collapsible-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
-.search-field { display: flex; flex: 1; flex-direction: column; gap: 7px; }
+.toolbar, .table-toolbar, .collapsible-head { display: flex; min-width: 0; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.search-field { display: flex; min-width: 0; flex: 1 1 260px; flex-direction: column; gap: 7px; }
 .toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .filter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--color-border); }
 .table-help { margin: 12px 0; color: var(--color-text-subtle); font-size: 0.78rem; }
@@ -162,12 +162,18 @@ td { color: var(--color-text-muted); font-size: 0.92rem; }
 .sort-button { width: 100%; border: 0; background: transparent; color: inherit; padding: 12px 10px; text-align: left; font: inherit; }
 .sort-button:hover { background: rgba(255, 100, 0, 0.08); color: var(--color-text); }
 .table-compact .sort-button { padding-top: 7px; padding-bottom: 7px; }
-.row-actions { display: flex; gap: 6px; }
+.row-actions { display: flex; justify-content: flex-start; gap: 6px; }
+.icon-btn { display: inline-flex; width: 34px; height: 34px; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: rgba(255, 255, 255, 0.04); color: var(--color-text-muted); padding: 7px; }
+.icon-btn:hover { border-color: var(--color-border-strong); background: rgba(255, 255, 255, 0.08); color: var(--color-text); }
+.icon-btn.danger { color: #fecdd3; }
+.icon-btn.danger:hover { border-color: rgba(251, 113, 133, 0.55); background: rgba(127, 29, 50, 0.45); color: #fff; }
+.icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 
-.dialog-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0.74); backdrop-filter: blur(8px); }
-.dialog-card { width: min(460px, 100%); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-panel-raised); box-shadow: var(--shadow-panel); padding: 24px; }
+.dialog-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; overflow-y: auto; padding: 24px; background: rgba(0, 0, 0, 0.74); backdrop-filter: blur(8px); }
+.dialog-card { width: min(460px, 100%); max-height: calc(100vh - 48px); overflow: auto; border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-panel-raised); box-shadow: var(--shadow-panel); padding: 24px; overscroll-behavior: contain; }
 .dialog-card h2 { margin-bottom: 10px; font-size: 2rem; }
 .dialog-card p { line-height: 1.55; }
+.csv-field-options { display: grid; max-height: min(52vh, 440px); gap: 4px; overflow-y: auto; margin-top: 16px; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); padding: 8px 4px 8px 0; overscroll-behavior: contain; }
 
 .dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 20px; }
 .dashboard-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
@@ -276,7 +282,10 @@ code { color: var(--color-accent-bright); font-family: var(--font-ui); font-size
   .form-grid, .settings-grid, .filter-grid { grid-template-columns: 1fr; }
   .field.full { grid-column: auto; }
   .page-head, .toolbar, .table-toolbar, .collapsible-head, .home-section-head { align-items: flex-start; flex-direction: column; }
-  .toolbar-actions { width: 100%; }
+  .toolbar-actions { width: 100%; align-items: stretch; }
+  .toolbar-actions > .btn, .toolbar-actions > select { flex: 1 1 auto; }
+  .dialog-backdrop { align-items: start; padding: 12px; }
+  .dialog-card { max-height: calc(100vh - 24px); padding: 18px; }
   .home-hero h1 { font-size: clamp(3.4rem, 16vw, 5.2rem); }
   .home-lede { font-size: 1.05rem; }
   .workflow-grid { grid-template-columns: 1fr; }
