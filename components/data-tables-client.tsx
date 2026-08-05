@@ -32,8 +32,7 @@ import {
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import {
   makeCsv,
-  parseCsv,
-  recordKey,
+  parseCsvRows,
   SaleRecord,
 } from "@/lib/comp-data-utils";
 
@@ -847,18 +846,18 @@ function TableView({
           </div>
           <div className="toolbar-actions">
             <span className="muted">{selected.length} selected</span>
-            {table.slug === "comp-data" && (
-              <CompDataCsvActions
-                supabase={supabase}
-                tableId={tableId}
-                rows={rows}
-                filteredRows={filtered}
-                canImport={canCreate(role)}
-                onComplete={load}
-                onError={setError}
-                onNotice={setNotice}
-              />
-            )}
+            <CompDataCsvActions
+              supabase={supabase}
+              tableId={tableId}
+              fields={fields}
+              rows={rows}
+              filteredRows={filtered}
+              isCompData={table.slug === "comp-data"}
+              canImport={canCreate(role)}
+              onComplete={load}
+              onError={setError}
+              onNotice={setNotice}
+            />
             <button
               className="btn primary"
               disabled={selected.length === 0 || exporting}
@@ -1036,8 +1035,10 @@ function TableView({
 function CompDataCsvActions({
   supabase,
   tableId,
+  fields,
   rows,
   filteredRows,
+  isCompData,
   canImport,
   onComplete,
   onError,
@@ -1045,8 +1046,10 @@ function CompDataCsvActions({
 }: {
   supabase: ReturnType<typeof createClient>;
   tableId: string;
+  fields: DataTableField[];
   rows: DataTableRow[];
   filteredRows: DataTableRow[];
+  isCompData: boolean;
   canImport: boolean;
   onComplete: () => Promise<void>;
   onError: (message: string) => void;
@@ -1054,6 +1057,12 @@ function CompDataCsvActions({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
+  const [pendingImport, setPendingImport] = useState<{
+    headers: string[];
+    rows: string[][];
+    unmatched: string[];
+  } | null>(null);
+  const [selectedNewFields, setSelectedNewFields] = useState<string[]>([]);
   function exportCsv() {
     const records = filteredRows.map(compRecordFromRow);
     if (!records.length) return;
@@ -1071,6 +1080,140 @@ function CompDataCsvActions({
       `Exported ${records.length} record${records.length === 1 ? "" : "s"} to CSV.`,
     );
   }
+  function normalizeHeader(header: string) {
+    return keyify(header);
+  }
+  function fieldForHeader(header: string, availableFields: DataTableField[]) {
+    const normalized = normalizeHeader(header);
+    return availableFields.find(
+      (field) =>
+        field.field_key === normalized || normalizeHeader(field.label) === normalized,
+    );
+  }
+  function csvValueForField(field: DataTableField, rawValue: string) {
+    const value = rawValue.trim();
+    if (!value) return field.field_type === "multi_select" ? [] : "";
+    if (field.field_type === "number" || field.field_type === "currency") {
+      const numberValue = Number(value);
+      if (!Number.isFinite(numberValue)) {
+        throw new Error(`${field.label} must contain numeric values in the CSV.`);
+      }
+      return numberValue;
+    }
+    if (field.field_type === "boolean") {
+      return ["true", "1", "yes", "y"].includes(value.toLowerCase());
+    }
+    if (field.field_type === "multi_select") {
+      return value.split(/[;|]/).map((item) => item.trim()).filter(Boolean);
+    }
+    return value;
+  }
+  function valuesForImport(
+    parsed: string[][],
+    availableFields: DataTableField[],
+    selectedHeaders: string[],
+  ) {
+    const headers = parsed[0].map((header) => header.trim());
+    const mapped = new Map<string, string>();
+    headers.forEach((header) => {
+      const field = fieldForHeader(header, availableFields);
+      if (field) mapped.set(header, field.field_key);
+      else if (selectedHeaders.includes(header)) mapped.set(header, normalizeHeader(header));
+    });
+    return parsed.slice(1).map((row, index) => {
+      if (row.length !== headers.length) {
+        throw new Error(`Row ${index + 2} has ${row.length} columns, but the header has ${headers.length}.`);
+      }
+      const values: Record<string, unknown> = {};
+      headers.forEach((header, columnIndex) => {
+        const fieldKey = mapped.get(header);
+        if (!fieldKey) return;
+        const field = availableFields.find((item) => item.field_key === fieldKey);
+        values[fieldKey] = field
+          ? csvValueForField(field, row[columnIndex])
+          : row[columnIndex].trim();
+      });
+      const validation = validateValues(availableFields, values);
+      if (Object.keys(validation).length) {
+        throw new Error(`Row ${index + 2}: ${Object.values(validation).join(" ")}`);
+      }
+      return values;
+    });
+  }
+  function duplicateKey(values: Record<string, unknown>, includedKeys?: Set<string>) {
+    return JSON.stringify(
+      Object.entries(values)
+        .filter(([key]) => !includedKeys || includedKeys.has(key))
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, value]) => [key, Array.isArray(value) ? value.join(",") : value]),
+    ).toLowerCase();
+  }
+  async function commitImport(
+    parsed: string[][],
+    selectedHeaders: string[],
+  ) {
+    const activeFields = fields.filter((field) => !field.is_archived);
+    const headers = parsed[0].map((header) => header.trim());
+    const unmatched = headers.filter((header) => !fieldForHeader(header, activeFields));
+    const headersToAdd = unmatched.filter((header) => selectedHeaders.includes(header));
+    const createdFields: DataTableField[] = [];
+    const usedKeys = new Set(activeFields.map((field) => field.field_key));
+    if (headersToAdd.length) {
+      const newFieldRows = headersToAdd.map((header, index) => {
+        const baseKey = normalizeHeader(header);
+        let fieldKey = baseKey;
+        let suffix = 2;
+        while (usedKeys.has(fieldKey)) fieldKey = `${baseKey}_${suffix++}`;
+        usedKeys.add(fieldKey);
+        return {
+          table_id: tableId,
+          label: header,
+          field_key: fieldKey,
+          field_type: "text" as FieldType,
+          required: false,
+          options: [],
+          display_order: activeFields.length + index + 1,
+        };
+      });
+      const fieldResult = await supabase
+        .from("data_table_fields")
+        .insert(newFieldRows)
+        .select();
+      if (fieldResult.error) throw fieldResult.error;
+      createdFields.push(...((fieldResult.data ?? []) as DataTableField[]));
+    }
+    const effectiveFields = [...activeFields, ...createdFields];
+    const values = valuesForImport(parsed, effectiveFields, headersToAdd);
+    const importKeys = new Set(values.flatMap((record) => Object.keys(record)));
+    const known = new Set(rows.map((row) => duplicateKey(row.values, importKeys)));
+    const incoming = new Set<string>();
+    const records = values.filter((record) => {
+      const key = duplicateKey(record, importKeys);
+      if (known.has(key) || incoming.has(key)) return false;
+      incoming.add(key);
+      return true;
+    });
+    const duplicates = values.length - records.length;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("You must be signed in.");
+    if (records.length) {
+      const result = await supabase.from("data_table_rows").insert(
+        records.map((record) => ({
+          table_id: tableId,
+          values: record,
+          created_by: user.id,
+          updated_by: user.id,
+        })),
+      );
+      if (result.error) throw result.error;
+    }
+    await onComplete();
+    setPendingImport(null);
+    setSelectedNewFields([]);
+    onNotice(
+      `Import complete. ${records.length} record${records.length === 1 ? "" : "s"} imported${createdFields.length ? `; ${createdFields.length} field${createdFields.length === 1 ? "" : "s"} added` : ""}${duplicates ? `; ${duplicates} duplicate${duplicates === 1 ? "" : "s"} skipped` : ""}.`,
+    );
+  }
   async function importCsv(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -1079,68 +1222,21 @@ function CompDataCsvActions({
     onError("");
     onNotice("");
     try {
-      const parsed = parseCsv(await file.text());
-      const known = new Set(
-        rows.map((row) => recordKey(compRecordFromRow(row))),
-      );
-      const incoming = new Set<string>();
-      const records: Array<Record<string, unknown>> = [];
-      let duplicates = 0;
-      parsed.slice(1).forEach((values) => {
-        const [
-          property_name,
-          address,
-          sale_date,
-          priceText,
-          acreageText,
-          seller,
-          buyer,
-          notes,
-        ] = values.map((value) => value.trim());
-        const record = {
-          property_name,
-          address,
-          sale_date,
-          sale_price: Number(priceText),
-          acreage: Number(acreageText),
-          seller,
-          buyer,
-          notes,
-        };
-        const key = recordKey(record as Omit<SaleRecord, "id">);
-        if (known.has(key) || incoming.has(key)) duplicates += 1;
-        else {
-          incoming.add(key);
-          records.push(record);
-        }
-      });
-      if (records.length) {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) throw new Error("You must be signed in.");
-        const result = await supabase
-          .from("data_table_rows")
-          .insert(
-            records.map((values) => ({
-              table_id: tableId,
-              values,
-              created_by: user.id,
-              updated_by: user.id,
-            })),
-          );
-        if (result.error) throw result.error;
-        await onComplete();
+      const parsed = parseCsvRows(await file.text());
+      if (parsed.length < 2) throw new Error("The CSV must include a header row and at least one data row.");
+      const headers = parsed[0].map((header) => header.trim());
+      if (headers.some((header) => !header)) throw new Error("Every CSV column must have a header.");
+      const activeFields = fields.filter((field) => !field.is_archived);
+      const unmatched = [...new Set(headers.filter((header) => !fieldForHeader(header, activeFields)))];
+      if (unmatched.length) {
+        setPendingImport({ headers, rows: parsed.slice(1), unmatched });
+        setSelectedNewFields(unmatched);
+        setImporting(false);
+        return;
       }
-      onNotice(
-        `Import complete. ${records.length} record${records.length === 1 ? "" : "s"} imported${duplicates ? `; ${duplicates} duplicate${duplicates === 1 ? "" : "s"} skipped` : ""}.`,
-      );
+      await commitImport(parsed, []);
     } catch (importError) {
-      onError(
-        importError instanceof Error
-          ? importError.message
-          : "The CSV could not be imported.",
-      );
+      onError(importError instanceof Error ? importError.message : "The CSV could not be imported.");
     } finally {
       setImporting(false);
     }
@@ -1162,14 +1258,62 @@ function CompDataCsvActions({
       >
         {importing ? "Importing…" : "Import CSV"}
       </button>
-      <button
-        type="button"
-        className="btn"
-        disabled={filteredRows.length === 0}
-        onClick={exportCsv}
-      >
-        Export CSV
-      </button>
+      {isCompData && (
+        <button
+          type="button"
+          className="btn"
+          disabled={filteredRows.length === 0}
+          onClick={exportCsv}
+        >
+          Export CSV
+        </button>
+      )}
+      {pendingImport && (
+        <div
+          className="dialog-backdrop"
+          role="presentation"
+          onMouseDown={() => !importing && setPendingImport(null)}
+        >
+          <div
+            className="dialog-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="csv-import-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 id="csv-import-title">Review new CSV fields</h2>
+            <p className="muted">
+              These CSV columns do not match fields in this table. Select the ones to add as text fields before importing {pendingImport.rows.length} record{pendingImport.rows.length === 1 ? "" : "s"}.
+            </p>
+            <div className="csv-field-options">
+              {pendingImport.unmatched.map((header) => (
+                <label className="checkbox-field" key={header}>
+                  <input
+                    type="checkbox"
+                    checked={selectedNewFields.includes(header)}
+                    onChange={() => setSelectedNewFields((current) => current.includes(header) ? current.filter((item) => item !== header) : [...current, header])}
+                  />
+                  <span><strong>{header}</strong><small>New text field</small></span>
+                </label>
+              ))}
+            </div>
+            <div className="actions">
+              <button type="button" className="btn" onClick={() => setPendingImport(null)} disabled={importing}>Cancel</button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  setImporting(true);
+                  void commitImport([pendingImport.headers, ...pendingImport.rows], selectedNewFields).catch((importError) => onError(importError instanceof Error ? importError.message : "The CSV could not be imported.")).finally(() => setImporting(false));
+                }}
+                disabled={importing}
+              >
+                {importing ? "Importingâ€¦" : "Import selected fields"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

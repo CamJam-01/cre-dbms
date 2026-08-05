@@ -69,7 +69,7 @@ function validateImportRows(rows: string[][]) {
   });
 }
 
-export function parseCsv(text: string) {
+export function parseCsvRows(text: string) {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = '';
@@ -92,6 +92,11 @@ export function parseCsv(text: string) {
   if (quoted) throw new Error('CSV format error: an opening quote is missing a closing quote. Check quoted values and retry.');
   row.push(cell);
   if (row.some(value => value.trim() !== '')) rows.push(row);
+  return rows;
+}
+
+export function parseCsv(text: string) {
+  const rows = parseCsvRows(text);
   validateImportRows(rows);
   return rows;
 }
