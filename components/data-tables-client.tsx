@@ -869,18 +869,16 @@ function TableView({
                     }
                   />
                 </th>
+                <th>Actions</th>
                 {fields.map((field) => (
                   <th key={field.id}>{field.label}</th>
                 ))}
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={fields.length + 2}>
-                    No records match this table.
-                  </td>
+                  <td colSpan={fields.length + 2}>No records match this table.</td>
                 </tr>
               ) : (
                 filtered.map((row) => (
@@ -893,49 +891,20 @@ function TableView({
                         onChange={() => toggleRow(row.id)}
                       />
                     </td>
+                    <td>
+                      <div className="row-actions">
+                        <RowActionIcon label="View record" icon="view" href={`/data-tables/${tableId}/records/${row.id}`} />
+                        {canEdit(role) && <RowActionIcon label="Edit record" icon="edit" href={`/data-tables/${tableId}/records/${row.id}/edit`} />}
+                        {canCreate(role) && <RowActionIcon label="Delete record" icon="delete" danger onClick={() => setPendingDelete(row.id)} />}
+                      </div>
+                    </td>
                     {fields.map((field) => (
                       <td key={field.id}>
                         {field.field_type === "image" ? (
-                          imageUrls[row.id] ? (
-                            <img
-                              className="table-thumb"
-                              alt=""
-                              src={imageUrls[row.id]}
-                            />
-                          ) : (
-                            "Attached"
-                          )
-                        ) : (
-                          formatValue(field, row.values[field.field_key])
-                        )}
+                          imageUrls[row.id] ? <img className="table-thumb" alt="" src={imageUrls[row.id]} /> : "Attached"
+                        ) : formatValue(field, row.values[field.field_key])}
                       </td>
                     ))}
-                    <td>
-                      <div className="row-actions">
-                        <Link
-                          className="btn"
-                          href={`/data-tables/${tableId}/records/${row.id}`}
-                        >
-                          View
-                        </Link>
-                        {canEdit(role) && (
-                          <Link
-                            className="btn"
-                            href={`/data-tables/${tableId}/records/${row.id}/edit`}
-                          >
-                            Edit
-                          </Link>
-                        )}
-                        {canCreate(role) && (
-                          <button
-                            className="btn danger"
-                            onClick={() => setPendingDelete(row.id)}
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                 ))
               )}
@@ -1011,6 +980,31 @@ function TableView({
       />
     </main>
   );
+}
+
+function RowActionIcon({
+  label,
+  icon,
+  href,
+  onClick,
+  danger = false,
+}: {
+  label: string;
+  icon: "view" | "edit" | "delete";
+  href?: string;
+  onClick?: () => void;
+  danger?: boolean;
+}) {
+  const className = `icon-btn${danger ? " danger" : ""}`;
+  const iconMarkup = icon === "view" ? (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /></svg>
+  ) : icon === "edit" ? (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5 4 16.5Z" /><path d="m13.5 7 3.5 3.5M4 21h16" /></svg>
+  ) : (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></svg>
+  );
+  if (href) return <Link className={className} href={href} aria-label={label} title={label}>{iconMarkup}</Link>;
+  return <button type="button" className={className} onClick={onClick} aria-label={label} title={label}>{iconMarkup}</button>;
 }
 
 function CompDataCsvActions({
