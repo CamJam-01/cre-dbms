@@ -30,11 +30,7 @@ import {
   validateValues,
 } from "@/lib/data-tables";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
-import {
-  makeCsv,
-  parseCsvRows,
-  SaleRecord,
-} from "@/lib/comp-data-utils";
+import { csvCell, parseCsvRows } from "@/lib/comp-data-utils";
 
 type Mode =
   "list" | "archived" | "new-table" | "table" | "record" | "edit" | "settings";
@@ -132,21 +128,6 @@ function formatValue(field: DataTableField, value: unknown) {
   if (field.field_type === "multi_select" && Array.isArray(value))
     return value.join(", ");
   return String(value);
-}
-
-function compRecordFromRow(row: DataTableRow): SaleRecord {
-  const values = row.values;
-  return {
-    id: row.id,
-    property_name: String(values.property_name ?? ""),
-    address: String(values.address ?? ""),
-    sale_date: String(values.sale_date ?? ""),
-    sale_price: Number(values.sale_price ?? 0),
-    acreage: Number(values.acreage ?? 0),
-    seller: String(values.seller ?? ""),
-    buyer: String(values.buyer ?? ""),
-    notes: String(values.notes ?? ""),
-  };
 }
 
 export function DataTablesClient({ mode, tableId, rowId }: Props) {
@@ -849,10 +830,10 @@ function TableView({
             <CompDataCsvActions
               supabase={supabase}
               tableId={tableId}
+              tableName={table.name}
               fields={fields}
               rows={rows}
               filteredRows={filtered}
-              isCompData={table.slug === "comp-data"}
               canImport={canCreate(role)}
               onComplete={load}
               onError={setError}
@@ -1035,10 +1016,10 @@ function TableView({
 function CompDataCsvActions({
   supabase,
   tableId,
+  tableName,
   fields,
   rows,
   filteredRows,
-  isCompData,
   canImport,
   onComplete,
   onError,
@@ -1046,10 +1027,10 @@ function CompDataCsvActions({
 }: {
   supabase: ReturnType<typeof createClient>;
   tableId: string;
+  tableName: string;
   fields: DataTableField[];
   rows: DataTableRow[];
   filteredRows: DataTableRow[];
-  isCompData: boolean;
   canImport: boolean;
   onComplete: () => Promise<void>;
   onError: (message: string) => void;
@@ -1064,20 +1045,27 @@ function CompDataCsvActions({
   } | null>(null);
   const [selectedNewFields, setSelectedNewFields] = useState<string[]>([]);
   function exportCsv() {
-    const records = filteredRows.map(compRecordFromRow);
-    if (!records.length) return;
+    const activeFields = fields.filter((field) => !field.is_archived);
+    if (!filteredRows.length || !activeFields.length) return;
+    const headerRow = activeFields.map((field) => csvCell(field.label));
+    const dataRows = filteredRows.map((row) => activeFields.map((field) => {
+      const value = row.values[field.field_key];
+      const text = Array.isArray(value) ? value.join("; ") : value === null || value === undefined ? "" : String(value);
+      return csvCell(text);
+    }));
+    const csv = [headerRow.join(","), ...dataRows.map((row) => row.join(","))].join("\r\n");
     const url = URL.createObjectURL(
-      new Blob([makeCsv(records)], { type: "text/csv;charset=utf-8;" }),
+      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
     );
     const link = document.createElement("a");
     link.href = url;
-    link.download = `comp-data-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `${slugify(tableName)}-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
     onNotice(
-      `Exported ${records.length} record${records.length === 1 ? "" : "s"} to CSV.`,
+      `Exported ${filteredRows.length} record${filteredRows.length === 1 ? "" : "s"} to CSV.`,
     );
   }
   function normalizeHeader(header: string) {
@@ -1258,16 +1246,14 @@ function CompDataCsvActions({
       >
         {importing ? "Importing…" : "Import CSV"}
       </button>
-      {isCompData && (
-        <button
-          type="button"
-          className="btn"
-          disabled={filteredRows.length === 0}
-          onClick={exportCsv}
-        >
-          Export CSV
-        </button>
-      )}
+      <button
+        type="button"
+        className="btn"
+        disabled={filteredRows.length === 0 || fields.every((field) => field.is_archived)}
+        onClick={exportCsv}
+      >
+        Export CSV
+      </button>
       {pendingImport && (
         <div
           className="dialog-backdrop"
