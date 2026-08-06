@@ -1,2 +1,5 @@
 import { DataTablesClient } from '@/components/data-tables-client';
-export default function NewTablePage() { return <DataTablesClient mode="new-table" />; }
+export default async function NewTablePage({ searchParams }: { searchParams: Promise<{ workspace?: string }> }) {
+  const { workspace } = await searchParams;
+  return <DataTablesClient mode="new-table" workspaceId={workspace} />;
+}

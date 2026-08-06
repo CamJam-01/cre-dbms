@@ -16,19 +16,6 @@ export default async function Home() {
           {!user && <Link className="btn" href="/signup">Create an account</Link>}
         </div>
       </div>
-
-      <div className="frame corner-mark hero-panel" aria-label="Comp Data product preview">
-        <div className="hero-panel-head"><span className="signal-dots"><span /><span /><span /></span><span>Live comp view</span></div>
-        <div className="query-box"><span>Active search</span><strong>Industrial land near I-95</strong></div>
-        <div className="metric-grid">
-          <div className="metric-card"><span className="metric-label">Matches</span><strong>24</strong><small>records found</small></div>
-          <div className="metric-card"><span className="metric-label">Median price</span><strong>$1.8M</strong><small>across selected comps</small></div>
-        </div>
-        <div className="preview-results">
-          <div className="preview-result"><div><strong>Northpoint Logistics Tract</strong><span>82.4 acres · 2025-06-18</span></div><span className="preview-score">0.98 match</span></div>
-          <div className="preview-result"><div><strong>Riverbend Commerce Park</strong><span>41.7 acres · 2025-04-03</span></div><span className="preview-score">0.94 match</span></div>
-        </div>
-      </div>
     </section>
 
     <section className="frame corner-mark home-section">
