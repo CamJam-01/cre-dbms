@@ -1,71 +1,43 @@
-'use client';
-
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/server';
 
-const defaults = { table_density: 'comfortable', show_filters_by_default: false } as const;
+type DashboardProps = { searchParams: Promise<{ workspace?: string }> };
 
-type Settings = { table_density: 'comfortable' | 'compact'; show_filters_by_default: boolean };
-type DashboardStats = { total: number; averagePrice: number; averageAcreage: number; latestDate: string; latestProperty: string };
-const emptyStats: DashboardStats = { total: 0, averagePrice: 0, averageAcreage: 0, latestDate: '', latestProperty: '' };
+export default async function DashboardPage({ searchParams }: DashboardProps) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
-export default function DashboardPage() {
-  const supabase = createClient();
-  const [name, setName] = useState('');
-  const [settings, setSettings] = useState<Settings>(defaults);
-  const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
-  const [stats, setStats] = useState<DashboardStats>(emptyStats);
-
-  const loadDashboard = useCallback(async () => {
-    void (async () => {
-      const { data } = await supabase.auth.getUser();
-      const metadata = data.user?.user_metadata ?? {};
-      setName(metadata.full_name ?? data.user?.email?.split('@')[0] ?? 'there');
-      setSettings({
-        table_density: metadata.table_density === 'compact' ? 'compact' : defaults.table_density,
-        show_filters_by_default: metadata.show_filters_by_default === true,
-      });
-      const { data: rows, error: statsError } = await supabase.from('comp_data').select('property_name,sale_date,sale_price,acreage').order('sale_date', { ascending: false });
-      if (statsError) { setError(statsError.message); return; }
-      const records = rows ?? [];
-      const total = records.length;
-      const averagePrice = total ? records.reduce((sum, row) => sum + Number(row.sale_price), 0) / total : 0;
-      const averageAcreage = total ? records.reduce((sum, row) => sum + Number(row.acreage), 0) / total : 0;
-      const latest = records[0];
-      setStats({ total, averagePrice, averageAcreage, latestDate: latest?.sale_date ?? '', latestProperty: latest?.property_name ?? '' });
-    })();
-  }, [supabase]);
-
-  useEffect(() => { void Promise.resolve().then(loadDashboard); }, [loadDashboard]);
-
-  async function saveSettings() {
-    setSaving(true); setError(''); setNotice('');
-    const { error: updateError } = await supabase.auth.updateUser({ data: settings });
-    if (updateError) setError(updateError.message);
-    else setNotice('Your preferences have been saved.');
-    setSaving(false);
-  }
+  const { data: workspaces, error: workspaceError } = await supabase
+    .from('workspaces')
+    .select('*')
+    .order('created_at');
+  const available = workspaces ?? [];
+  const requested = (await searchParams).workspace;
+  const active = available.find(workspace => workspace.id === requested) ?? available[0];
+  const tableIds = active ? (await supabase.from('data_tables').select('id,name,description,is_archived,workspace_id').eq('workspace_id', active.id).order('created_at')).data ?? [] : [];
+  const ids = tableIds.map(table => table.id);
+  const [{ data: views }, { data: templates }] = active
+    ? await Promise.all([
+        supabase.from('saved_views').select('*').eq('workspace_id', active.id).order('updated_at', { ascending: false }),
+        ids.length ? supabase.from('docx_templates').select('*').in('table_id', ids).order('created_at', { ascending: false }) : Promise.resolve({ data: [] as never[] }),
+      ])
+    : [{ data: [] }, { data: [] }];
+  const tableNames = new Map(tableIds.map(table => [table.id, table.name]));
 
   return <main className="container">
-    <div className="page-head"><div><h1>Dashboard</h1><div className="muted">Welcome back, {name || 'there'}.</div></div></div>
-    <section className="dashboard-grid">
-      <article className="card dashboard-card"><div className="dashboard-kicker">Workspace</div><h2>Data Tables</h2><p className="muted">Create structured tables, manage records, validate fields, and export DOCX reports.</p><Link className="btn primary" href="/data-tables">Open Data Tables</Link></article>
-      <article className="card dashboard-card"><div className="dashboard-kicker">Latest activity</div><h2>{stats.latestProperty || 'No records yet'}</h2><p className="muted">{stats.latestDate ? `Most recent sale recorded ${stats.latestDate}.` : 'Create a data table to start building the workspace.'}</p><Link className="btn" href="/data-tables">Review tables</Link></article>
-    </section>
-    <section className="dashboard-metrics" aria-label="Comp Data summary">
-      <article className="metric-card"><span className="metric-label">Total records</span><strong>{stats.total}</strong><small>available comparables</small></article>
-      <article className="metric-card"><span className="metric-label">Average sale price</span><strong>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(stats.averagePrice)}</strong><small>across current records</small></article>
-      <article className="metric-card"><span className="metric-label">Average acreage</span><strong>{stats.averageAcreage.toFixed(2)}</strong><small>acres per comparable</small></article>
-    </section>
-    <section className="card settings-card"><h2 style={{ marginTop: 0 }}>UX settings</h2><div className="settings-grid">
-      <div className="field"><label htmlFor="table-density">Comp Data table density</label><select id="table-density" value={settings.table_density} onChange={e => setSettings(s => ({ ...s, table_density: e.target.value as Settings['table_density'] }))}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select><span className="field-help">Compact shows more records on screen; comfortable gives rows more breathing room.</span></div>
-      <label className="checkbox-field"><input type="checkbox" checked={settings.show_filters_by_default} onChange={e => setSettings(s => ({ ...s, show_filters_by_default: e.target.checked }))} /><span><strong>Show Comp Data filters by default</strong><small>Open the filter controls automatically when you visit Comp Data.</small></span></label>
+    <div className="page-head">
+      <div><div className="eyebrow">Vantage CRE</div><h1>Dashboard</h1><p className="muted">Your Workspace is the home for Tables, Views, Templates, and members.</p></div>
+      {available.length > 0 && <form className="toolbar-actions" method="get"><label className="sr-only" htmlFor="workspace-select">Active Workspace</label><select id="workspace-select" name="workspace" defaultValue={active?.id}><option value="" disabled>Select Workspace</option>{available.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select><button className="btn" type="submit">Switch</button></form>}
     </div>
-      {error && <div className="alert" style={{ marginTop: 16 }}>{error}</div>}{notice && <div className="notice" style={{ marginTop: 16 }}>{notice}</div>}
-      <div className="actions"><button className="btn primary" disabled={saving} onClick={saveSettings}>{saving ? 'Saving…' : 'Save preferences'}</button></div>
-    </section>
+    {workspaceError && <div className="alert">{workspaceError.message}</div>}
+    {!active ? <section className="card empty-card"><h2>No Workspaces yet</h2><p className="muted">Create a Table to create your first Workspace.</p><Link className="btn primary" href="/tables/new">Create Table</Link></section> : <>
+      <section className="card dashboard-card"><div className="dashboard-kicker">Active Workspace</div><h2>{active.name}</h2><p className="muted">{tableIds.filter(table => !table.is_archived).length} active Tables · {views?.length ?? 0} saved Views · {templates?.length ?? 0} Templates</p><div className="actions"><Link className="btn primary" href={`/workspaces/${active.id}`}>Open Workspace</Link><Link className="btn" href="/tables/new">Create Table</Link></div></section>
+      <section className="dashboard-grid">
+        <article className="card"><div className="section-head"><div><div className="section-label">Tables</div><h2>Workspace Tables</h2></div><Link className="btn" href={`/workspaces/${active.id}`}>View all</Link></div>{tableIds.filter(table => !table.is_archived).slice(0, 6).map(table => <Link className="settings-row" key={table.id} href={`/tables/${table.id}`}><span><strong>{table.name}</strong><small className="muted">{table.description || 'No description yet.'}</small></span><span>Open →</span></Link>)}</article>
+        <article className="card"><div className="section-head"><div><div className="section-label">Views</div><h2>Saved Views</h2></div></div>{views?.length ? views.slice(0, 6).map(view => <Link className="settings-row" key={view.id} href={`/tables/${view.table_id}?view=${view.id}`}><span><strong>{view.name}</strong><small className="muted">{tableNames.get(view.table_id) ?? 'Table'}</small></span><span>{view.is_shared ? 'Shared' : 'Private'}</span></Link>) : <p className="muted">Save a search from a Table to see it here.</p>}</article>
+      </section>
+      <section className="card"><div className="section-head"><div><div className="section-label">Templates</div><h2>Shared Templates</h2></div></div>{templates?.length ? <div className="settings-list">{templates.map(template => <div className="settings-row" key={template.id}><span><strong>{template.name}</strong><small className="muted">{tableNames.get(template.table_id) ?? 'Table'}</small></span><span>{template.is_shared ? 'Shared' : 'Private'}</span></div>)}</div> : <p className="muted">Templates uploaded from Table Settings will appear here.</p>}</section>
+    </>}
   </main>;
 }

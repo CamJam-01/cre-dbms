@@ -5,3 +5,4 @@ out/
 output/
 .playwright-cli/
 *.tsbuildinfo
+supabase/.temp/

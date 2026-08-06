@@ -19,7 +19,7 @@ import {
   DataRowImage,
   DataTable,
   DataTableField,
-  DataTableMember,
+  WorkspaceMember,
   DataTableRow,
   DocxTemplate,
   FIELD_TYPES,
@@ -29,6 +29,7 @@ import {
   TableRole,
   validateValues,
 } from "@/lib/data-tables";
+import { getTableWorkspaceRole } from "@/lib/workspace";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { csvCell, parseCsvRows } from "@/lib/comp-data-utils";
 
@@ -170,14 +171,25 @@ function TableList({
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error: loadError } = await supabase
-      .from("data_tables")
-      .select("*")
-      .eq("is_archived", false)
-      .order("created_at");
-    if (loadError) setError(loadError.message);
-    else setTables((data ?? []) as DataTable[]);
-    setLoading(false);
+    setError("");
+    try {
+      const result = await Promise.race([
+        supabase
+          .from("data_tables")
+          .select("*")
+          .eq("is_archived", false)
+          .order("created_at"),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(() => reject(new Error("Loading tables timed out. Please refresh and try again.")), 10000),
+        ),
+      ]);
+      if (result.error) setError(result.error.message);
+      else setTables((result.data ?? []) as DataTable[]);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Unable to load tables.");
+    } finally {
+      setLoading(false);
+    }
   }, [supabase]);
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -187,18 +199,18 @@ function TableList({
       <div className="page-head">
         <div>
           <div className="eyebrow">Workspace</div>
-          <h1>Data Tables</h1>
+          <h1>Tables</h1>
           <p className="muted">
-            Create structured workspaces for comps, markets, and transaction
+            Create structured tables for comps, markets, and transaction
             intelligence.
           </p>
         </div>
         <div className="toolbar-actions">
-          <Link className="btn" href="/data-tables/archived">
+          <Link className="btn" href="/tables/archived">
             Archived tables
           </Link>
-          <Link className="btn primary" href="/data-tables/new">
-            Create data table
+          <Link className="btn primary" href="/tables/new">
+            Create Table
           </Link>
         </div>
       </div>
@@ -209,11 +221,11 @@ function TableList({
         <div className="table-card-grid">
           {tables.length === 0 ? (
             <section className="card empty-card">
-              <h2>No data tables yet</h2>
+                <h2>No Tables yet</h2>
               <p className="muted">
                 Create your first table and define the fields your records need.
               </p>
-              <Link className="btn primary" href="/data-tables/new">
+              <Link className="btn primary" href="/tables/new">
                 Create your first table
               </Link>
             </section>
@@ -222,9 +234,9 @@ function TableList({
               <Link
                 className="card table-card"
                 key={table.id}
-                href={`/data-tables/${table.id}`}
+                href={`/tables/${table.id}`}
               >
-                <span className="eyebrow">Data table</span>
+                <span className="eyebrow">Table</span>
                 <h2>{table.name}</h2>
                 <p className="muted">
                   {table.description || "No description yet."}
@@ -254,42 +266,13 @@ function ArchivedTables({
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [
-      { data, error: loadError },
-      {
-        data: { user },
-      },
-    ] = await Promise.all([
-      supabase
-        .from("data_tables")
-        .select("*")
-        .eq("is_archived", true)
-        .order("updated_at", { ascending: false }),
-      supabase.auth.getUser(),
-    ]);
+    const { data, error: loadError } = await supabase
+      .from("data_tables")
+      .select("*")
+      .eq("is_archived", true)
+      .order("updated_at", { ascending: false });
     if (loadError) setError(loadError.message);
-    else if (data?.length && user) {
-      const { data: memberData } = await supabase
-        .from("data_table_members")
-        .select("table_id,role")
-        .in(
-          "table_id",
-          data.map((table) => table.id),
-        )
-        .eq("user_id", user.id);
-      const roles = new Map(
-        (memberData ?? []).map((member) => [
-          member.table_id,
-          member.role as TableRole,
-        ]),
-      );
-      setTables(
-        data.map((table) => ({
-          ...table,
-          role: table.owner_id === user.id ? "admin" : roles.get(table.id),
-        })) as Array<DataTable & { role?: TableRole }>,
-      );
-    } else setTables((data ?? []) as Array<DataTable & { role?: TableRole }>);
+    else setTables((data ?? []) as Array<DataTable & { role?: TableRole }>);
     setLoading(false);
   }, [supabase]);
   useEffect(() => {
@@ -299,7 +282,7 @@ function ArchivedTables({
     setRestoring(tableId);
     setError("");
     setNotice("");
-    const response = await fetch(`/api/data-tables/${tableId}`, {
+    const response = await fetch(`/api/tables/${tableId}`, {
       method: "POST",
     });
     const result = await response.json().catch(() => ({}));
@@ -326,7 +309,7 @@ function ArchivedTables({
             Archived tables you own or have permission to access.
           </p>
         </div>
-        <Link className="btn" href="/data-tables">
+        <Link className="btn" href="/tables">
           Active tables
         </Link>
       </div>
@@ -363,7 +346,7 @@ function ArchivedTables({
                   {table.description || "No description yet."}
                 </p>
                 <div className="toolbar-actions">
-                  <Link className="btn" href={`/data-tables/${table.id}`}>
+                  <Link className="btn" href={`/tables/${table.id}`}>
                     View table
                   </Link>
                   {table.role === "admin" && (
@@ -491,8 +474,11 @@ function NewTable({
     }
     const table = created.data as DataTable;
     const member = await supabase
-      .from("data_table_members")
-      .insert({ table_id: table.id, user_id: user.id, role: "admin" });
+      .from("workspace_members")
+      .upsert(
+        { workspace_id: workspace.id, user_id: user.id, role: "admin" },
+        { onConflict: "workspace_id,user_id" },
+      );
     if (member.error) {
       setError(member.error.message);
       setSaving(false);
@@ -506,7 +492,7 @@ function NewTable({
       setSaving(false);
       return;
     }
-    router.push(`/data-tables/${table.id}`);
+    router.push(`/tables/${table.id}`);
     router.refresh();
   }
   return (
@@ -514,10 +500,10 @@ function NewTable({
       <div className="page-head">
         <div>
           <div className="eyebrow">New workspace</div>
-          <h1>Create data table</h1>
+          <h1>Create Table</h1>
           <p className="muted">Define the schema your records will use.</p>
         </div>
-        <Link className="btn" href="/data-tables">
+        <Link className="btn" href="/tables">
           Cancel
         </Link>
       </div>
@@ -603,7 +589,7 @@ function NewTable({
         </div>
         <div className="actions">
           <button className="btn primary" disabled={saving}>
-            {saving ? "Creating…" : "Create data table"}
+            {saving ? "Creating…" : "Create Table"}
           </button>
         </div>
       </form>
@@ -623,6 +609,14 @@ function TableView({
   const [rows, setRows] = useState<DataTableRow[]>([]);
   const [role, setRole] = useState<TableRole>();
   const [query, setQuery] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<Record<string, { value?: string; min?: string; max?: string; from?: string; to?: string }>>({});
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [views, setViews] = useState<Array<{ id: string; name: string; search_term: string; filters: Record<string, Record<string, string>>; sort_key: string | null; sort_direction: "asc" | "desc"; is_shared: boolean }>>([]);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewName, setViewName] = useState("");
+  const [shareView, setShareView] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [templates, setTemplates] = useState<DocxTemplate[]>([]);
   const [templateId, setTemplateId] = useState("");
@@ -683,30 +677,51 @@ function TableView({
           setImageUrls((current) => ({ ...current, [row.id]: data.signedUrl }));
       }
     }
-    if (user && tableData) {
-      const { data: member } = await supabase
-        .from("data_table_members")
-        .select("role")
-        .eq("table_id", tableId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-      setRole(
-        (member?.role as TableRole) ??
-          (tableData.owner_id === user.id ? "admin" : undefined),
-      );
+    if (user && tableData) setRole(await getTableWorkspaceRole(supabase, tableId));
+    if (tableData) {
+      const { data: viewData } = await supabase.from("saved_views").select("id,name,search_term,filters,sort_key,sort_direction,is_shared").eq("table_id", tableId).order("updated_at", { ascending: false });
+      setViews((viewData ?? []) as typeof views);
     }
     setLoading(false);
   }, [supabase, tableId]);
   useEffect(() => {
     void Promise.resolve().then(load);
   }, [load]);
-  const filtered = rows.filter(
-    (row) =>
-      !query.trim() ||
-      JSON.stringify(row.values)
-        .toLowerCase()
-        .includes(query.trim().toLowerCase()),
-  );
+  const filtered = useMemo(() => {
+    const result = rows.filter(row => {
+      const searchable = JSON.stringify(row.values).toLowerCase();
+      if (query.trim() && !searchable.includes(query.trim().toLowerCase())) return false;
+      return fields.every(field => {
+        const filter = filters[field.field_key];
+        if (!filter) return true;
+        const value = row.values[field.field_key];
+        if (filter.value && (Array.isArray(value) ? !value.includes(filter.value) : String(value ?? '').toLowerCase() !== filter.value.toLowerCase())) return false;
+        const numeric = Number(value);
+        if (filter.min && (!Number.isFinite(numeric) || numeric < Number(filter.min))) return false;
+        if (filter.max && (!Number.isFinite(numeric) || numeric > Number(filter.max))) return false;
+        if (filter.from && String(value ?? '') < filter.from) return false;
+        if (filter.to && String(value ?? '') > filter.to) return false;
+        return true;
+      });
+    });
+    if (!sortKey) return result;
+    return [...result].sort((a, b) => {
+      const left = a.values[sortKey]; const right = b.values[sortKey];
+      const comparison = String(left ?? '').localeCompare(String(right ?? ''), undefined, { numeric: true, sensitivity: 'base' });
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [rows, fields, query, filters, sortKey, sortDirection]);
+  const activeFilterCount = Object.values(filters).filter(filter => Object.values(filter).some(Boolean)).length;
+  function clearFilters() { setFilters({}); setQuery(''); }
+  function loadView(viewId: string) {
+    const view = views.find(item => item.id === viewId); if (!view) return;
+    setQuery(view.search_term); setFilters(view.filters ?? {}); setSortKey(view.sort_key); setSortDirection(view.sort_direction); setNotice(`View “${view.name}” loaded.`);
+  }
+  async function saveView() {
+    if (!table || !viewName.trim()) return;
+    const result = await supabase.from('saved_views').insert({ workspace_id: table.workspace_id, table_id: table.id, name: viewName.trim(), search_term: query, filters, sort_key: sortKey, sort_direction: sortDirection, is_shared: shareView }).select('id,name,search_term,filters,sort_key,sort_direction,is_shared').single();
+    if (result.error) setError(result.error.message); else { setViews(current => [result.data as typeof views[number], ...current]); setViewDialogOpen(false); setViewName(''); setShareView(false); setNotice('View saved.'); }
+  }
   function toggleRow(id: string) {
     setSelected((current) =>
       current.includes(id)
@@ -786,7 +801,7 @@ function TableView({
     <main className="container">
       <div className="page-head">
         <div>
-          <div className="eyebrow">Data table</div>
+          <div className="eyebrow">Table</div>
           <h1>{table.name}</h1>
           <p className="muted">
             {table.description ||
@@ -794,18 +809,18 @@ function TableView({
           </p>
         </div>
         <div className="toolbar-actions">
-          <Link className="btn" href="/data-tables">
+          <Link className="btn" href="/tables">
             All tables
           </Link>
           {canAdmin(role) && (
-            <Link className="btn" href={`/data-tables/${tableId}/settings`}>
+            <Link className="btn" href={`/tables/${tableId}/settings`}>
               Table settings
             </Link>
           )}
           {canCreate(role) && (
             <Link
               className="btn primary"
-              href={`/data-tables/${tableId}/records/new`}
+              href={`/tables/${tableId}/records/new`}
             >
               Add record
             </Link>
@@ -826,6 +841,11 @@ function TableView({
             />
           </div>
           <div className="toolbar-actions">
+            <button type="button" className={`icon-btn${filtersOpen ? " active" : ""}`} aria-label="Open filters" title="Open filters" onClick={() => setFiltersOpen(value => !value)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+            </button>
+            <select aria-label="Saved View" value="" onChange={event => loadView(event.target.value)}><option value="">Views</option>{views.map(view => <option key={view.id} value={view.id}>{view.name}{view.is_shared ? " · Shared" : ""}</option>)}</select>
+            <button type="button" className="btn" onClick={() => setViewDialogOpen(true)}>Save View</button>
             <span className="muted">{selected.length} selected</span>
             <CompDataCsvActions
               supabase={supabase}
@@ -848,6 +868,8 @@ function TableView({
             </button>
           </div>
         </div>
+        {filtersOpen && <div className="filter-grid" aria-label="Table filters">{fields.filter(field => field.field_type !== "long_text" && field.field_type !== "image").map(field => { const current = filters[field.field_key] ?? {}; const setFilter = (patch: Record<string, string>) => setFilters(value => ({ ...value, [field.field_key]: { ...value[field.field_key], ...patch } })); return <div className="field" key={field.id}><label htmlFor={`filter-${field.field_key}`}>{field.label}</label>{field.field_type === "number" || field.field_type === "currency" ? <div className="filter-range"><input id={`filter-${field.field_key}`} type="number" placeholder="Min" value={current.min ?? ""} onChange={event => setFilter({ min: event.target.value })} /><input aria-label={`${field.label} maximum`} type="number" placeholder="Max" value={current.max ?? ""} onChange={event => setFilter({ max: event.target.value })} /></div> : field.field_type === "date" ? <div className="filter-range"><input id={`filter-${field.field_key}`} type="date" value={current.from ?? ""} onChange={event => setFilter({ from: event.target.value })} /><input aria-label={`${field.label} through`} type="date" value={current.to ?? ""} onChange={event => setFilter({ to: event.target.value })} /></div> : field.field_type === "boolean" ? <select id={`filter-${field.field_key}`} value={current.value ?? ""} onChange={event => setFilter({ value: event.target.value })}><option value="">Any</option><option value="true">Yes</option><option value="false">No</option></select> : field.field_type === "single_select" || field.field_type === "multi_select" ? <select id={`filter-${field.field_key}`} value={current.value ?? ""} onChange={event => setFilter({ value: event.target.value })}><option value="">Any</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}</select> : <input id={`filter-${field.field_key}`} value={current.value ?? ""} onChange={event => setFilter({ value: event.target.value })} placeholder="Contains…" />}</div>; })}<div className="actions"><span className="muted">{activeFilterCount} active filter{activeFilterCount === 1 ? "" : "s"}</span><button type="button" className="btn" onClick={clearFilters}>Clear filters</button></div></div>}
+        <div className="table-help muted">Select a column header to sort. {filtered.length} of {rows.length} records shown.</div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -871,7 +893,7 @@ function TableView({
                 </th>
                 <th>Actions</th>
                 {fields.map((field) => (
-                  <th key={field.id}>{field.label}</th>
+                  <th key={field.id}><button type="button" className="sort-button" onClick={() => { if (sortKey === field.field_key) setSortDirection(value => value === "asc" ? "desc" : "asc"); else { setSortKey(field.field_key); setSortDirection("asc"); } }}>{field.label}{sortKey === field.field_key ? (sortDirection === "asc" ? " ↑" : " ↓") : ""}</button></th>
                 ))}
               </tr>
             </thead>
@@ -893,8 +915,8 @@ function TableView({
                     </td>
                     <td>
                       <div className="row-actions">
-                        <RowActionIcon label="View record" icon="view" href={`/data-tables/${tableId}/records/${row.id}`} />
-                        {canEdit(role) && <RowActionIcon label="Edit record" icon="edit" href={`/data-tables/${tableId}/records/${row.id}/edit`} />}
+                        <RowActionIcon label="View record" icon="view" href={`/tables/${tableId}/records/${row.id}`} />
+                        {canEdit(role) && <RowActionIcon label="Edit record" icon="edit" href={`/tables/${tableId}/records/${row.id}/edit`} />}
                         {canCreate(role) && <RowActionIcon label="Delete record" icon="delete" danger onClick={() => setPendingDelete(row.id)} />}
                       </div>
                     </td>
@@ -912,6 +934,7 @@ function TableView({
           </table>
         </div>
       </section>
+      {viewDialogOpen && <div className="dialog-backdrop" role="presentation" onMouseDown={() => setViewDialogOpen(false)}><div className="dialog-card" role="dialog" aria-modal="true" aria-labelledby="view-dialog-title" onMouseDown={event => event.stopPropagation()}><h2 id="view-dialog-title">Save View</h2><p className="muted">Save the current search, filters, and sort order for this Table.</p><div className="field"><label htmlFor="view-name">View name</label><input id="view-name" autoFocus value={viewName} onChange={event => setViewName(event.target.value)} placeholder="e.g. Recent industrial sales" /></div><label className="checkbox-field"><input type="checkbox" checked={shareView} onChange={event => setShareView(event.target.checked)} /><span><strong>Share with Workspace</strong><small>Make this View available to other Workspace members.</small></span></label><div className="actions"><button type="button" className="btn" onClick={() => setViewDialogOpen(false)}>Cancel</button><button type="button" className="btn primary" disabled={!viewName.trim()} onClick={() => void saveView()}>Save View</button></div></div></div>}
       {exportDialogOpen && (
         <div
           className="dialog-backdrop"
@@ -1358,18 +1381,7 @@ function RecordView({
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (user) {
-        const { data: member } = await supabase
-          .from("data_table_members")
-          .select("role")
-          .eq("table_id", tableId)
-          .eq("user_id", user.id)
-          .maybeSingle();
-        setRole(
-          (member?.role as TableRole) ??
-            (tableData?.owner_id === user.id ? "admin" : undefined),
-        );
-      }
+      if (user) setRole(await getTableWorkspaceRole(supabase, tableId));
     })();
   }, [supabase, tableId, rowId]);
   function changeField(field: DataTableField, value: unknown) {
@@ -1430,7 +1442,7 @@ function RecordView({
       if (result.error || !result.data)
         throw result.error ?? new Error("The record could not be saved.");
       await uploadImages(result.data.id);
-      router.push(`/data-tables/${tableId}/records/${result.data.id}`);
+      router.push(`/tables/${tableId}/records/${result.data.id}`);
       router.refresh();
     } catch (saveError) {
       setError(
@@ -1606,13 +1618,13 @@ function RecordView({
           </p>
         </div>
         <div className="toolbar-actions">
-          <Link className="btn" href={`/data-tables/${tableId}`}>
+          <Link className="btn" href={`/tables/${tableId}`}>
             Back to table
           </Link>
           {!isNew && !edit && canWrite && (
             <Link
               className="btn primary"
-              href={`/data-tables/${tableId}/records/${rowId}/edit`}
+              href={`/tables/${tableId}/records/${rowId}/edit`}
             >
               Edit record
             </Link>
@@ -1659,8 +1671,8 @@ function RecordView({
                 className="btn"
                 href={
                   isNew
-                    ? `/data-tables/${tableId}`
-                    : `/data-tables/${tableId}/records/${rowId}`
+                    ? `/tables/${tableId}`
+                    : `/tables/${tableId}/records/${rowId}`
                 }
               >
                 Cancel
@@ -1827,7 +1839,7 @@ function TableSettings({
   const [users, setUsers] = useState<
     Array<{ id: string; email: string; full_name: string }>
   >([]);
-  const [members, setMembers] = useState<DataTableMember[]>([]);
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [templates, setTemplates] = useState<DocxTemplate[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -1837,23 +1849,30 @@ function TableSettings({
   const [pendingFieldDelete, setPendingFieldDelete] =
     useState<DataTableField | null>(null);
   const load = useCallback(async () => {
+    const { data: tableData, error: tableError } = await supabase
+      .from("data_tables")
+      .select("*")
+      .eq("id", tableId)
+      .single();
+    if (tableError || !tableData) {
+      setError(tableError?.message ?? "The table could not be loaded.");
+      return;
+    }
     const [
-      { data: tableData },
       { data: fieldData },
       { data: memberData },
       { data: userData },
       { data: templateData },
     ] = await Promise.all([
-      supabase.from("data_tables").select("*").eq("id", tableId).single(),
       supabase
         .from("data_table_fields")
         .select("*")
         .eq("table_id", tableId)
         .order("display_order"),
       supabase
-        .from("data_table_members")
+        .from("workspace_members")
         .select("*, user:users(email, full_name)")
-        .eq("table_id", tableId),
+        .eq("workspace_id", tableData.workspace_id),
       supabase.from("users").select("id,email,full_name").order("email"),
       supabase
         .from("docx_templates")
@@ -1863,7 +1882,7 @@ function TableSettings({
     ]);
     setTable(tableData as DataTable);
     setFields((fieldData ?? []) as DataTableField[]);
-    setMembers((memberData ?? []) as DataTableMember[]);
+    setMembers((memberData ?? []) as WorkspaceMember[]);
     setUsers(
       (userData ?? []) as Array<{
         id: string;
@@ -1942,10 +1961,10 @@ function TableSettings({
   async function addMember(event: ChangeEvent<HTMLSelectElement>) {
     if (!event.target.value) return;
     const result = await supabase
-      .from("data_table_members")
+      .from("workspace_members")
       .upsert(
-        { table_id: tableId, user_id: event.target.value, role: "viewer" },
-        { onConflict: "table_id,user_id" },
+        { workspace_id: table?.workspace_id, user_id: event.target.value, role: "viewer" },
+        { onConflict: "workspace_id,user_id" },
       )
       .select("*, user:users(email, full_name)")
       .single();
@@ -1953,15 +1972,15 @@ function TableSettings({
     else {
       setMembers((current) => [
         ...current.filter((member) => member.user_id !== event.target.value),
-        result.data as DataTableMember,
+        result.data as WorkspaceMember,
       ]);
       setNotice("User added as viewer.");
     }
     event.target.value = "";
   }
-  async function updateMember(member: DataTableMember, role: TableRole) {
+  async function updateMember(member: WorkspaceMember, role: TableRole) {
     const result = await supabase
-      .from("data_table_members")
+      .from("workspace_members")
       .update({ role })
       .eq("id", member.id);
     if (result.error) setError(result.error.message);
@@ -2013,6 +2032,11 @@ function TableSettings({
       );
     }
   }
+  async function updateTemplateSharing(template: DocxTemplate, is_shared: boolean) {
+    const result = await supabase.from('docx_templates').update({ is_shared }).eq('id', template.id);
+    if (result.error) setError(result.error.message);
+    else setTemplates(current => current.map(item => item.id === template.id ? { ...item, is_shared } : item));
+  }
   if (!table)
     return (
       <main className="container">
@@ -2024,7 +2048,7 @@ function TableSettings({
     setPendingDelete(false);
     setError("");
     setNotice("Deleting table…");
-    const response = await fetch(`/api/data-tables/${tableId}`, {
+    const response = await fetch(`/api/tables/${tableId}`, {
       method: "DELETE",
     });
     const result = await response.json().catch(() => ({}));
@@ -2034,7 +2058,7 @@ function TableSettings({
       setError(result.error || "The table could not be deleted.");
       return;
     }
-    router.push("/data-tables");
+    router.push("/tables");
     router.refresh();
   }
   return (
@@ -2048,7 +2072,7 @@ function TableSettings({
           </p>
         </div>
         <div className="toolbar-actions">
-          <Link className="btn" href={`/data-tables/${tableId}`}>
+          <Link className="btn" href={`/tables/${tableId}`}>
             Back to table
           </Link>
           <button
@@ -2063,7 +2087,7 @@ function TableSettings({
               if (result.error) setError(result.error.message);
               else {
                 setNotice("Table archived.");
-                router.push("/data-tables");
+                router.push("/tables");
                 router.refresh();
               }
             }}
@@ -2249,7 +2273,6 @@ function TableSettings({
               >
                 <option value="viewer">Read-only</option>
                 <option value="editor">Read & update</option>
-                <option value="operator">Full CRUD</option>
                 <option value="admin">Administrator</option>
               </select>
             </div>
@@ -2270,10 +2293,8 @@ function TableSettings({
         <div className="settings-list">
           {templates.map((template) => (
             <div className="settings-row" key={template.id}>
-              <span>{template.name}</span>
-              <span className="muted">
-                Uploaded {new Date(template.created_at).toLocaleDateString()}
-              </span>
+              <span><strong>{template.name}</strong><small className="muted">Uploaded {new Date(template.created_at).toLocaleDateString()}</small></span>
+              <label className="checkbox-field"><input type="checkbox" checked={template.is_shared} onChange={event => void updateTemplateSharing(template, event.target.checked)} /><span>Share with Workspace</span></label>
             </div>
           ))}
         </div>

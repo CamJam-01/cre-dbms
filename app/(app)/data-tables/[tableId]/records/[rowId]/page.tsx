@@ -1,2 +1,2 @@
-import { DataTablesClient } from '@/components/data-tables-client';
-export default async function RecordDetailPage({ params }: { params: Promise<{ tableId: string; rowId: string }> }) { const { tableId, rowId } = await params; return <DataTablesClient mode="record" tableId={tableId} rowId={rowId} />; }
+import { notFound } from 'next/navigation';
+export default function LegacyRecordRoute() { notFound(); }

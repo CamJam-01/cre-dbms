@@ -1,6 +1,7 @@
 export const FIELD_TYPES = ['text', 'long_text', 'number', 'currency', 'date', 'boolean', 'single_select', 'multi_select', 'image'] as const;
 export type FieldType = typeof FIELD_TYPES[number];
-export type TableRole = 'viewer' | 'editor' | 'operator' | 'admin';
+export type TableRole = 'viewer' | 'editor' | 'admin';
+export type WorkspaceRole = TableRole;
 
 export type DataTable = {
   id: string;
@@ -26,10 +27,14 @@ export type DataTableField = {
   is_archived: boolean;
 };
 
-export type DataTableMember = { id: string; table_id: string; user_id: string; role: TableRole; user?: { email: string; full_name: string } };
+export type WorkspaceMember = { id: string; workspace_id: string; user_id: string; role: WorkspaceRole; user?: { email: string; full_name: string } };
+export type Workspace = { id: string; name: string; owner_id: string; created_at: string; updated_at: string };
+export type WorkspaceInvitation = { id: string; workspace_id: string; email: string; role: WorkspaceRole; invited_by: string; status: string; expires_at: string; created_at: string };
+export type ViewFilters = Record<string, { value?: unknown; min?: unknown; max?: unknown; from?: string; to?: string }>;
+export type SavedView = { id: string; workspace_id: string; table_id: string; name: string; search_term: string; filters: ViewFilters; sort_key: string | null; sort_direction: 'asc' | 'desc'; is_shared: boolean; created_by: string; created_at: string; updated_at: string };
 export type DataTableRow = { id: string; table_id: string; values: Record<string, unknown>; created_by: string; updated_by: string; created_at: string; updated_at: string; images?: DataRowImage[] };
 export type DataRowImage = { id: string; row_id: string; storage_path: string; original_filename: string; mime_type: string; file_size: number; display_order: number; is_thumbnail: boolean; created_at: string };
-export type DocxTemplate = { id: string; table_id: string; name: string; description: string; storage_path: string; supported_fields: string[]; uploaded_by: string; created_at: string };
+export type DocxTemplate = { id: string; table_id: string; name: string; description: string; storage_path: string; supported_fields: string[]; uploaded_by: string; is_shared: boolean; created_at: string };
 
 export function slugify(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'table';
@@ -61,6 +66,6 @@ export function validateValues(fields: DataTableField[], values: Record<string, 
   return errors;
 }
 
-export function canCreate(role?: TableRole) { return role === 'operator' || role === 'admin'; }
+export function canCreate(role?: TableRole) { return role === 'admin'; }
 export function canEdit(role?: TableRole) { return role === 'editor' || canCreate(role); }
 export function canAdmin(role?: TableRole) { return role === 'admin'; }
