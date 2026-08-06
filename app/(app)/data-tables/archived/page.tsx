@@ -1,5 +1,2 @@
-import { DataTablesClient } from '@/components/data-tables-client';
-
-export default function ArchivedTablesPage() {
-  return <DataTablesClient mode="archived" />;
-}
+import { notFound } from 'next/navigation';
+export default function LegacyArchivedTablesRoute() { notFound(); }

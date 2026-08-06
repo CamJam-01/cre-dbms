@@ -1,2 +1,2 @@
-import { DataTablesClient } from '@/components/data-tables-client';
-export default function DataTablesPage() { return <DataTablesClient mode="list" />; }
+import { notFound } from 'next/navigation';
+export default function LegacyTablesRoute() { notFound(); }
