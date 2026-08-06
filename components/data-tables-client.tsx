@@ -719,7 +719,9 @@ function TableView({
   }
   async function saveView() {
     if (!table || !viewName.trim()) return;
-    const result = await supabase.from('saved_views').insert({ workspace_id: table.workspace_id, table_id: table.id, name: viewName.trim(), search_term: query, filters, sort_key: sortKey, sort_direction: sortDirection, is_shared: shareView }).select('id,name,search_term,filters,sort_key,sort_direction,is_shared').single();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setError('You must be signed in to save a View.'); return; }
+    const result = await supabase.from('saved_views').insert({ created_by: user.id, workspace_id: table.workspace_id, table_id: table.id, name: viewName.trim(), search_term: query, filters, sort_key: sortKey, sort_direction: sortDirection, is_shared: shareView }).select('id,name,search_term,filters,sort_key,sort_direction,is_shared').single();
     if (result.error) setError(result.error.message); else { setViews(current => [result.data as typeof views[number], ...current]); setViewDialogOpen(false); setViewName(''); setShareView(false); setNotice('View saved.'); }
   }
   function toggleRow(id: string) {
