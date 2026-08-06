@@ -35,7 +35,7 @@ import { csvCell, parseCsvRows } from "@/lib/comp-data-utils";
 
 type Mode =
   "list" | "archived" | "new-table" | "table" | "record" | "edit" | "settings";
-type Props = { mode: Mode; tableId?: string; rowId?: string };
+type Props = { mode: Mode; tableId?: string; rowId?: string; workspaceId?: string };
 
 const starterFields: Array<
   Pick<
@@ -131,13 +131,13 @@ function formatValue(field: DataTableField, value: unknown) {
   return String(value);
 }
 
-export function DataTablesClient({ mode, tableId, rowId }: Props) {
+export function DataTablesClient({ mode, tableId, rowId, workspaceId: requestedWorkspaceId }: Props) {
   const supabase = useSupabase();
   const router = useRouter();
   if (mode === "list") return <TableList supabase={supabase} />;
   if (mode === "archived") return <ArchivedTables supabase={supabase} />;
   if (mode === "new-table")
-    return <NewTable supabase={supabase} router={router} />;
+    return <NewTable supabase={supabase} router={router} workspaceId={requestedWorkspaceId} />;
   if (!tableId)
     return (
       <main className="container">
@@ -371,9 +371,11 @@ function ArchivedTables({
 function NewTable({
   supabase,
   router,
+  workspaceId: requestedWorkspaceId,
 }: {
   supabase: ReturnType<typeof createClient>;
   router: ReturnType<typeof useRouter>;
+  workspaceId?: string;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -431,13 +433,15 @@ function NewTable({
       setSaving(false);
       return;
     }
-    let { data: workspace } = await supabase
-      .from("workspaces")
-      .select("id")
-      .eq("owner_id", user.id)
-      .order("created_at")
-      .limit(1)
-      .maybeSingle();
+    let { data: workspace } = requestedWorkspaceId
+      ? await supabase.from("workspaces").select("id").eq("id", requestedWorkspaceId).maybeSingle()
+      : await supabase
+          .from("workspaces")
+          .select("id")
+          .eq("owner_id", user.id)
+          .order("created_at")
+          .limit(1)
+          .maybeSingle();
     if (!workspace) {
       const created = await supabase
         .from("workspaces")

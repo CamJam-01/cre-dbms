@@ -18,3 +18,13 @@ export async function PATCH(request: Request, context: Context) {
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
+
+export async function GET(request: Request, context: Context) {
+  const { workspaceId } = await context.params;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { data: members, error } = await supabase.from('workspace_members').select('*, user:users(email, full_name)').eq('workspace_id', workspaceId);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ members: members ?? [] });
+}
