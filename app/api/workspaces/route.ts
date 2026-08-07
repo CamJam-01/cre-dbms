@@ -9,7 +9,6 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const name = String(body.name ?? '').trim();
-  const requestedUserIds = Array.isArray(body.user_ids) ? body.user_ids.map(String) : [];
   if (!name) return NextResponse.json({ error: 'A Workspace name is required.' }, { status: 400 });
   if (name.length > 120) return NextResponse.json({ error: 'Workspace names must be 120 characters or fewer.' }, { status: 400 });
 
@@ -17,11 +16,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Workspace creation is not configured on this server. Add SUPABASE_SERVICE_ROLE_KEY to the server environment.' }, { status: 503 });
   }
   const admin = createAdminClient();
-  const { data: selectedUsers, error: selectedUsersError } = requestedUserIds.length
-    ? await admin.from('users').select('id').in('id', requestedUserIds).neq('id', user.id)
-    : { data: [] as { id: string }[] };
-  if (selectedUsersError) return NextResponse.json({ error: selectedUsersError.message }, { status: 400 });
-
   // The owner has to create both the Workspace and its first membership in one
   // server-side operation. The public RLS policy currently rejects the initial
   // Workspace insert before the owner membership exists, so keep the user
@@ -34,9 +28,8 @@ export async function POST(request: Request) {
     .single();
   if (workspaceError || !workspace) return NextResponse.json({ error: workspaceError?.message ?? 'The Workspace could not be created.' }, { status: 400 });
 
-  const memberIds = [user.id, ...(selectedUsers ?? []).map(selectedUser => selectedUser.id)];
   const { error: memberError } = await admin.from('workspace_members').upsert(
-    memberIds.map(userId => ({ workspace_id: workspace.id, user_id: userId, role: userId === user.id ? 'admin' : 'viewer' })),
+    { workspace_id: workspace.id, user_id: user.id, role: 'admin' },
     { onConflict: 'workspace_id,user_id' },
   );
   if (memberError) {
