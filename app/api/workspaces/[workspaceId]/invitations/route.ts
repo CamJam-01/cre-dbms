@@ -8,8 +8,9 @@ async function authorize(workspaceId: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  const { data: workspace } = await supabase.from('workspaces').select('owner_id').eq('id', workspaceId).maybeSingle();
   const { data: member } = await supabase.from('workspace_members').select('role').eq('workspace_id', workspaceId).eq('user_id', user.id).maybeSingle();
-  if (member?.role !== 'admin') return { response: NextResponse.json({ error: 'Workspace administrator access is required.' }, { status: 403 }) };
+  if (workspace?.owner_id !== user.id && member?.role !== 'admin') return { response: NextResponse.json({ error: 'Workspace administrator access is required.' }, { status: 403 }) };
   return { supabase, user };
 }
 
@@ -22,16 +23,16 @@ export async function POST(request: Request, context: Context) {
   const role = ['viewer', 'editor', 'admin'].includes(body.role) ? body.role : 'viewer';
   if (!email || !email.includes('@')) return NextResponse.json({ error: 'A valid email address is required.' }, { status: 400 });
 
-  const { data: existing } = await authorized.supabase.from('users').select('id,email').eq('email', email).maybeSingle();
+  const admin = createAdminClient();
+  const { data: existing } = await admin.from('users').select('id,email').eq('email', email).maybeSingle();
   if (existing) {
-    const { error } = await authorized.supabase.from('workspace_members').upsert({ workspace_id: workspaceId, user_id: existing.id, role }, { onConflict: 'workspace_id,user_id' });
+    const { error } = await admin.from('workspace_members').upsert({ workspace_id: workspaceId, user_id: existing.id, role }, { onConflict: 'workspace_id,user_id' });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ status: 'member', email });
   }
 
   const { data: invitation, error: invitationError } = await authorized.supabase.from('workspace_invitations').insert({ workspace_id: workspaceId, email, role, invited_by: authorized.user.id }).select().single();
   if (invitationError) return NextResponse.json({ error: invitationError.message }, { status: 400 });
-  const admin = createAdminClient();
   const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, { data: { workspace_id: workspaceId, invitation_id: invitation.id }, redirectTo: new URL('/auth/callback', request.url).toString() });
   if (inviteError) {
     await authorized.supabase.from('workspace_invitations').update({ status: 'revoked' }).eq('id', invitation.id);
